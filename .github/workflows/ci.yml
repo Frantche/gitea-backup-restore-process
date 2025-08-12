@@ -1,81 +1,129 @@
-name: Build and Test
+name: Docker CI/CD
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
 
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
-    
-    - name: Cache Go modules
-      uses: actions/cache@v4
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-    
-    - name: Download dependencies
-      run: go mod download
-    
-    - name: Run tests
-      run: go test -v ./...
-    
-    - name: Build binaries
-      run: |
-        go build -o bin/gitea-backup ./cmd/gitea-backup
-        go build -o bin/gitea-restore ./cmd/gitea-restore
-    
-    - name: Test build
-      run: |
-        ./bin/gitea-backup --help || echo "Binary built successfully"
-        ./bin/gitea-restore --help || echo "Binary built successfully"
+    permissions:
+      contents: write
+      packages: write
+      attestations: write
+      id-token: write
 
-  build-docker:
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'push'
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Login to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: harbor.frantchenco.page
-        username: ${{ secrets.HARBOR_USERNAME }}
-        password: ${{ secrets.HARBOR_PASSWORD }}
-    
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: harbor.frantchenco.page/library/gitea-backup
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha
-          type=raw,value=latest,enable={{is_default_branch}}
-    
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Build binaries
+        run: |
+          go build -o bin/gitea-backup ./cmd/gitea-backup
+          go build -o bin/gitea-restore ./cmd/gitea-restore
+
+      - name: Test build
+        run: |
+          ./bin/gitea-backup --help || echo "Binary built successfully"
+          ./bin/gitea-restore --help || echo "Binary built successfully"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set lowercase repo name
+        run: |
+          REPO_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          echo "REPO_LOWER=${REPO_NAME}" >> $GITHUB_ENV
+
+      - name: Build Docker Image (for PR test)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: testimage:pr
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish-image:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set lowercase repo name
+        run: |
+          REPO_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          echo "REPO_LOWER=${REPO_NAME}" >> $GITHUB_ENV
+
+      - name: Get next version
+        id: get_version
+        uses: thenativeweb/get-next-version@main
+        with:
+          prefix: ''
+
+      - name: Create and push Git tag
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+
+      - name: Build and push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ env.REPO_LOWER }}:${{ steps.get_version.outputs.version }}
+            ghcr.io/${{ env.REPO_LOWER }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
