@@ -1,0 +1,20 @@
+kind: pipeline
+name: default
+
+steps:
+- name: publish to harbor frantchenco.page  
+  image: plugins/docker
+  settings:
+    repo: harbor.frantchenco.page/library/gitea-backup
+    dockerfile: dockerfile
+    username:
+      from_secret: harbor_username
+    password:
+      from_secret: harbor_password
+    registry: harbor.frantchenco.page
+    auto_tag: true
+    tags:
+      - latest
+    cache_from:
+      - "harbor.frantchenco.page/library/gitea-backup"
+      

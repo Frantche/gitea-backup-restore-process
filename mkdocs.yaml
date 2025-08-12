@@ -1,0 +1,77 @@
+---
+site_name: Gitea backup & restore python script
+site_description: Documentation on how to use Gitea backup & restore python script
+site_url: https://static.forge.amadeus.net/francois/gitea-backup-restore-docker
+site_author: Frantchenco
+
+# Repository
+repo_name: gitea-backup-restore-docker
+repo_url: https://gitea.frantchenco.page/francois/gitea-backup-restore-docker
+edit_uri: browse/ldap_synchronisation/
+
+# Extensions
+markdown_extensions:
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - toc:
+      permalink: true
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.tasklist:
+      custom_checkbox: true
+      clickable_checkbox: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+nav:
+- Introduction: 
+  - overview: index.md
+  - configuration: configuration.md
+- Tests: 
+  - overview: Tests/index.md
+  - mock data: Tests/mock_data.md
+  - mock data SQL: Tests/mock_data_sql.md
+- Development:
+  - Contributing: CONTRIBUTING.md
+  - Code of Conduct: CODE_OF_CONDUCT.md
+  - Coverage report: coverage.md
+# defer to gen-files + literate-nav
+- ...
+
+# Plugins
+plugins:
+  - search
+  - awesome-pages:
+      collapse_single_pages: true
+  - coverage:
+      page_name: coverage  # default
+      html_report_dir: ./htmlcov  # default
+
+
+use_directory_urls: false
+theme:
+  font:
+    text: Roboto
+  favicon: assets/favicon.png
+  logo: assets/logo.png
+  name: material
+  palette:
+    primary: blue
+  # custom_dir: docs/overrides
+  features:
+    - content.tabs.link
+    - navigation.tabs
+
+
+extra:
+  social:
+    # - icon: fontawesome/brands/confluence
+    #   link: https://rndwww.nce.amadeus.net/confluence/display/AR/
+    # - icon: fontawesome/brands/bitbucket
+    #   link: https://rndwww.nce.amadeus.net/git/projects/ar/repos/artifactory-ldap-synchronisation
