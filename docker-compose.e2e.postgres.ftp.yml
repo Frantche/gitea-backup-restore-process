@@ -102,6 +102,7 @@ services:
     volumes:
       - gitea-data:/data
       - ./tests/e2e/gitea-config:/etc/gitea-config:ro
+      - ./tests:/tests:ro
     depends_on:
       gitea-e2e:
         condition: service_healthy

@@ -66,7 +66,7 @@ docker exec gitea-backup-e2e-postgres sh -c '
     export CONTAINER_NAME="gitea-backup-e2e-postgres"
     export DATA_VOLUME_NAME="gitea-backup-restore-process_gitea-data-postgres"
     export GITEA_CONTAINER_NAME="gitea-e2e-postgres"
-    cd /tests/e2e && go run e2e_test.go
+    cd /tests/e2e && go run e2e.go
 '
 
 echo "✅ PostgreSQL + S3 E2E test completed successfully!"

@@ -39,7 +39,7 @@ echo "🧪 Building E2E test..."
 cd tests/e2e
 go mod init e2e-test 2>/dev/null || true
 go mod tidy
-go build -o e2e_test e2e_test.go
+go build -o e2e_test e2e.go
 
 echo "🚀 Running E2E test..."
 ./e2e_test

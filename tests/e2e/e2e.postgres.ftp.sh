@@ -66,7 +66,7 @@ docker exec gitea-backup-e2e-postgres-ftp sh -c '
     export CONTAINER_NAME="gitea-backup-e2e-postgres-ftp"
     export DATA_VOLUME_NAME="gitea-backup-restore-process_gitea-data-postgres-ftp"
     export GITEA_CONTAINER_NAME="gitea-e2e-postgres-ftp"
-    cd /tests/e2e && go run e2e_test.go
+    cd /tests/e2e && go run e2e.go
 '
 
 echo "✅ PostgreSQL + FTP E2E test completed successfully!"

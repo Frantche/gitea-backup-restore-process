@@ -66,7 +66,7 @@ docker exec gitea-backup-e2e-ftp sh -c '
     export CONTAINER_NAME="gitea-backup-e2e-ftp"
     export DATA_VOLUME_NAME="gitea-backup-restore-process_gitea-data-ftp"
     export GITEA_CONTAINER_NAME="gitea-e2e-ftp"
-    cd /tests/e2e && go run e2e_test.go
+    cd /tests/e2e && go run e2e.go
 '
 
 echo "✅ MySQL + FTP E2E test completed successfully!"

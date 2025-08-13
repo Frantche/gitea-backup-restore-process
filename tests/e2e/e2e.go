@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -21,19 +19,6 @@ type GiteaUser struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	FullName string `json:"full_name"`
-}
-
-// GiteaRepo represents a Gitea repository
-type GiteaRepo struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Private     bool   `json:"private"`
-}
-
-// GiteaIssue represents a Gitea issue
-type GiteaIssue struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
 }
 
 // E2ETest manages the end-to-end testing process
@@ -245,79 +230,32 @@ func (t *E2ETest) createUserAndToken() error {
 }
 
 func (t *E2ETest) createTestData() error {
-	logger.Info("Creating test data...")
+	logger.Info("Creating test data using bootstrap script...")
 
-	// Create repository
-	if err := t.createRepository(); err != nil {
-		return fmt.Errorf("failed to create repository: %w", err)
+	// Use the gitea_bootstrap.sh script to create repository and issue
+	bootstrapScript := "/tests/e2e/gitea_bootstrap.sh"
+	args := []string{
+		bootstrapScript,
+		t.giteaURL,
+		t.username,
+		"e2epassword",
+		t.repoName,
+		"E2E Test Issue",
+		"This is a test issue created for end-to-end testing of backup and restore functionality.",
 	}
 
-	// Create issue
-	if err := t.createIssue(); err != nil {
-		return fmt.Errorf("failed to create issue: %w", err)
+	cmd := exec.Command("bash", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("bootstrap script failed: %w\nOutput: %s", err, string(output))
 	}
 
+	logger.Info("Test data created successfully using bootstrap script")
+	logger.Debugf("Bootstrap output: %s", string(output))
 	return nil
 }
 
-func (t *E2ETest) createRepository() error {
-	repo := GiteaRepo{
-		Name:        t.repoName,
-		Description: "E2E test repository",
-		Private:     false,
-	}
 
-	jsonData, _ := json.Marshal(repo)
-	req, err := http.NewRequest("POST", t.giteaURL+"/api/v1/user/repos", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(t.username, "e2epassword")
-
-	resp, err := t.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 201 && resp.StatusCode != 409 { // 409 = already exists
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to create repository: %d - %s", resp.StatusCode, string(body))
-	}
-
-	logger.Info("Repository created successfully")
-	return nil
-}
-
-func (t *E2ETest) createIssue() error {
-	issue := GiteaIssue{
-		Title: "E2E Test Issue",
-		Body:  "This is a test issue created for end-to-end testing of backup and restore functionality.",
-	}
-
-	jsonData, _ := json.Marshal(issue)
-	req, err := http.NewRequest("POST", t.giteaURL+"/api/v1/repos/"+t.username+"/"+t.repoName+"/issues", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(t.username, "e2epassword")
-
-	resp, err := t.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 201 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to create issue: %d - %s", resp.StatusCode, string(body))
-	}
-
-	logger.Info("Issue created successfully")
-	return nil
-}
 
 func (t *E2ETest) performBackup() error {
 	logger.Info("Performing backup...")

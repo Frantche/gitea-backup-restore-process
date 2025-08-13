@@ -32,6 +32,35 @@ The E2E testing infrastructure validates the complete backup and restore workflo
 | FTP           | MySQL    | FTP     | `make test-e2e-ftp` |
 | Full Alt      | PostgreSQL | FTP   | `make test-e2e-postgres-ftp` |
 
+## Test Infrastructure Components
+
+### Gitea Bootstrap Script (`gitea_bootstrap.sh`)
+
+A reusable script for initializing Gitea instances with test data across all E2E test configurations.
+
+**Usage:**
+```bash
+./gitea_bootstrap.sh <gitea_url> <user> <password> <repo_name> <issue_title> [issue_body]
+```
+
+**Example:**
+```bash
+./gitea_bootstrap.sh http://localhost:3000 e2euser e2epassword test-repo "Bug Report" "Test issue description"
+```
+
+**What it does:**
+- Creates a new repository with auto-initialization (README.md)
+- Creates a test issue within the repository
+- Uses Gitea REST API for consistent data creation
+- Provides standardized test data across all E2E test scenarios
+- Ensures reproducible test environments
+
+**Dependencies:**
+- `curl`: For HTTP API calls
+- `jq`: For JSON processing
+
+The bootstrap script is automatically used by the Go-based E2E test (`e2e.go`) to create consistent test data across all database and storage combinations.
+
 ## Test Scripts
 
 ### Local E2E Test (`local_e2e_test.sh`)
@@ -103,7 +132,7 @@ Run all test combinations:
 make test-e2e-all
 ```
 
-### Full E2E Test (`e2e_test.go`)
+### Full E2E Test (`e2e.go`)
 
 A complete Go-based test that performs the full backup/restore cycle with data validation. This test is configurable and used by all the Docker-based test scripts.
 
