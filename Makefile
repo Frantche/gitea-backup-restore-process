@@ -1,8 +1,8 @@
-.PHONY: help build test test-unit test-e2e test-e2e-local clean
+.PHONY: help build test test-unit test-integration test-e2e test-e2e-local clean
 
 help: ## Display this help message
 	@echo "Available targets:"
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ": ## "} /^[a-zA-Z0-9_-]+: ## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build the backup and restore binaries
 	@echo "🔨 Building binaries..."
@@ -10,7 +10,8 @@ build: ## Build the backup and restore binaries
 	@go build -o bin/gitea-restore ./cmd/gitea-restore
 	@echo "✅ Build completed"
 
-test: test-unit test-integration test-e2e-local ## Run all tests
+test: ## Run all tests
+test: test-unit test-integration test-e2e-local
 
 test-unit: ## Run unit tests
 	@echo "🧪 Running unit tests..."
@@ -22,12 +23,14 @@ test-integration: ## Run integration tests
 	@go test -v ./tests/integration/...
 	@echo "✅ Integration tests completed"
 
-test-e2e-local: build ## Run local E2E tests
+test-e2e-local: ## Run local E2E tests
+	$(MAKE) build
 	@echo "🧪 Running local E2E tests..."
 	@./tests/e2e/local_e2e_test.sh
 	@echo "✅ Local E2E tests completed"
 
-test-e2e: build ## Run full E2E tests with Docker
+test-e2e: ## Run full E2E tests with Docker
+	$(MAKE) build
 	@echo "🧪 Running full E2E tests..."
 	@./tests/e2e/basic_e2e_test.sh
 	@echo "✅ Full E2E tests completed"
