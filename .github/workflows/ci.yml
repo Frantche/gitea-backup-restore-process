@@ -51,10 +51,22 @@ jobs:
           go build -o bin/gitea-backup ./cmd/gitea-backup
           go build -o bin/gitea-restore ./cmd/gitea-restore
 
-      - name: Run E2E tests
+      - name: Run local E2E tests
         run: |
           chmod +x tests/e2e/local_e2e_test.sh
           ./tests/e2e/local_e2e_test.sh
+
+      - name: Run E2E tests (MySQL + S3)
+        run: make test-e2e
+
+      - name: Run E2E tests (PostgreSQL + S3)
+        run: make test-e2e-postgres
+
+      - name: Run E2E tests (MySQL + FTP)
+        run: make test-e2e-ftp
+
+      - name: Run E2E tests (PostgreSQL + FTP)
+        run: make test-e2e-postgres-ftp
 
       - name: Test build
         run: |
