@@ -51,7 +51,7 @@ make test-e2e-local
 - Basic error handling
 - File system operations
 
-### Basic E2E Test (`basic_e2e_test.sh`)
+### MySQL + S3 E2E Test (`e2e.mysql.s3.sh`)
 
 A comprehensive test using Docker Compose to create a full Gitea environment with MySQL + S3.
 
@@ -59,10 +59,10 @@ A comprehensive test using Docker Compose to create a full Gitea environment wit
 ```bash
 make test-e2e
 # or
-./tests/e2e/basic_e2e_test.sh
+./tests/e2e/e2e.mysql.s3.sh
 ```
 
-### PostgreSQL E2E Test (`postgres_e2e_test.sh`)
+### PostgreSQL + S3 E2E Test (`e2e.postgres.s3.sh`)
 
 Tests PostgreSQL database backend with S3 storage.
 
@@ -70,10 +70,10 @@ Tests PostgreSQL database backend with S3 storage.
 ```bash
 make test-e2e-postgres
 # or
-./tests/e2e/postgres_e2e_test.sh
+./tests/e2e/e2e.postgres.s3.sh
 ```
 
-### FTP E2E Test (`ftp_e2e_test.sh`)
+### MySQL + FTP E2E Test (`e2e.mysql.ftp.sh`)
 
 Tests FTP storage backend with MySQL database.
 
@@ -81,10 +81,10 @@ Tests FTP storage backend with MySQL database.
 ```bash
 make test-e2e-ftp
 # or
-./tests/e2e/ftp_e2e_test.sh
+./tests/e2e/e2e.mysql.ftp.sh
 ```
 
-### PostgreSQL + FTP E2E Test (`postgres_ftp_e2e_test.sh`)
+### PostgreSQL + FTP E2E Test (`e2e.postgres.ftp.sh`)
 
 Tests the combination of PostgreSQL database with FTP storage.
 
@@ -92,7 +92,7 @@ Tests the combination of PostgreSQL database with FTP storage.
 ```bash
 make test-e2e-postgres-ftp
 # or
-./tests/e2e/postgres_ftp_e2e_test.sh
+./tests/e2e/e2e.postgres.ftp.sh
 ```
 
 ### All E2E Tests
@@ -125,10 +125,10 @@ A complete Go-based test that performs the full backup/restore cycle with data v
 
 Multiple compose files for different test scenarios:
 
-- `docker-compose.e2e.yml`: MySQL + S3 (default)
-- `docker-compose.e2e.postgres.yml`: PostgreSQL + S3
-- `docker-compose.e2e.ftp.yml`: MySQL + FTP
-- `docker-compose.e2e.postgres-ftp.yml`: PostgreSQL + FTP
+- `docker-compose.e2e.mysql.s3.yml`: MySQL + S3 (default)
+- `docker-compose.e2e.postgres.s3.yml`: PostgreSQL + S3
+- `docker-compose.e2e.mysql.ftp.yml`: MySQL + FTP
+- `docker-compose.e2e.postgres.ftp.yml`: PostgreSQL + FTP
 
 Each defines a complete testing environment with:
 
@@ -179,9 +179,9 @@ make clean
 make build
 
 # Run specific test
-./tests/e2e/postgres_e2e_test.sh
-./tests/e2e/ftp_e2e_test.sh
-./tests/e2e/postgres_ftp_e2e_test.sh
+./tests/e2e/e2e.postgres.s3.sh
+./tests/e2e/e2e.mysql.ftp.sh
+./tests/e2e/e2e.postgres.ftp.sh
 ```
 
 ## Test Scenarios
@@ -260,13 +260,13 @@ docker compose -f docker-compose.e2e.postgres.yml logs
 
 ```bash
 # Check Docker logs for specific configuration
-docker compose -f docker-compose.e2e.postgres.yml logs
+docker compose -f docker-compose.e2e.postgres.s3.yml logs
 
 # Check specific service
 docker logs gitea-e2e-postgres
 
 # Run tests with debug output
-BACKUP_LOG_LEVEL=debug ./tests/e2e/postgres_e2e_test.sh
+BACKUP_LOG_LEVEL=debug ./tests/e2e/e2e.postgres.s3.sh
 ```
 
 ### Service-Specific Debugging
@@ -296,9 +296,9 @@ The E2E tests are integrated into the GitHub Actions workflow:
 
 When adding new E2E tests:
 
-1. Follow the existing naming convention (`*_e2e_test.sh`)
+1. Follow the existing naming convention (`e2e.{db-type}.{target-type}.sh`)
 2. Add appropriate cleanup in test scripts (use trap for cleanup functions)
 3. Update this documentation
 4. Ensure tests are deterministic and can run in parallel
-5. Add new docker-compose files for new service combinations
+5. Add new docker-compose files for new service combinations following `docker-compose.e2e.{db-type}.{target-type}.yml` pattern
 6. Update Makefile with new test targets

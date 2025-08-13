@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.e2e.postgres.yml"
+COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.e2e.postgres.s3.yml"
 
 echo "🧪 Starting E2E test with PostgreSQL + S3..."
 

@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# E2E Test Script for MySQL + FTP Configuration
-# This script tests the backup and restore process using MySQL database and FTP storage
+# E2E Test Script for PostgreSQL + FTP Configuration
+# This script tests the backup and restore process using PostgreSQL database and FTP storage
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-COMPOSE_FILE="${PROJECT_ROOT}/docker compose.e2e.ftp.yml"
+COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.e2e.postgres.ftp.yml"
 
-echo "🧪 Starting E2E test with MySQL + FTP..."
+echo "🧪 Starting E2E test with PostgreSQL + FTP..."
 
 # Cleanup function
 cleanup() {
@@ -51,22 +51,22 @@ timeout 300 bash -c '
 
 echo "✅ All services are healthy"
 
-# Check that MySQL is working
-echo "🔍 Verifying MySQL connection..."
-docker exec gitea-db-e2e-ftp mysqladmin ping -h localhost -u gitea -pgitea123
+# Check that PostgreSQL is working
+echo "🔍 Verifying PostgreSQL connection..."
+docker exec gitea-db-e2e-postgres-ftp pg_isready -U gitea -d gitea
 
 # Check that FTP is working
 echo "🔍 Verifying FTP connectivity..."
-docker exec gitea-backup-e2e-ftp sh -c 'echo "test connection" | nc -w 5 ftp-server 21 | head -1 | grep -q "220"'
+docker exec gitea-backup-e2e-postgres-ftp sh -c 'echo "test connection" | nc -w 5 ftp-server 21 | head -1 | grep -q "220"'
 
 echo "🧪 Running E2E test..."
-# Run the E2E test in the backup container with FTP environment
-docker exec gitea-backup-e2e-ftp sh -c '
-    export GITEA_URL="http://gitea-e2e-ftp:3000"
-    export CONTAINER_NAME="gitea-backup-e2e-ftp"
-    export DATA_VOLUME_NAME="gitea-backup-restore-process_gitea-data-ftp"
-    export GITEA_CONTAINER_NAME="gitea-e2e-ftp"
+# Run the E2E test in the backup container with PostgreSQL + FTP environment
+docker exec gitea-backup-e2e-postgres-ftp sh -c '
+    export GITEA_URL="http://gitea-e2e-postgres-ftp:3000"
+    export CONTAINER_NAME="gitea-backup-e2e-postgres-ftp"
+    export DATA_VOLUME_NAME="gitea-backup-restore-process_gitea-data-postgres-ftp"
+    export GITEA_CONTAINER_NAME="gitea-e2e-postgres-ftp"
     cd /tests/e2e && go run e2e_test.go
 '
 
-echo "✅ MySQL + FTP E2E test completed successfully!"
+echo "✅ PostgreSQL + FTP E2E test completed successfully!"

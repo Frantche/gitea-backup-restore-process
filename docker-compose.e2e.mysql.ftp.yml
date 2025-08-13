@@ -1,29 +1,51 @@
-version: "3.9"
+# Common configurations
+x-gitea-common: &gitea-common
+  image: gitea/gitea:1.21
+  environment:
+    - GITEA__security__INSTALL_LOCK=true
+    - GITEA__security__SECRET_KEY=e2e-test-secret-key-for-testing-only
+    - GITEA__service__DISABLE_REGISTRATION=false
+    - GITEA__service__REQUIRE_SIGNIN_VIEW=false
+    - USER_UID=1000
+    - USER_GID=1000
+  ports:
+    - "3000:3000"
+  volumes:
+    - gitea-data:/data
+    - ./tests/e2e/gitea-config/app.mysql.ini:/data/gitea/conf/app.ini:ro
+    - ./tests/e2e/gitea-config:/etc/gitea-config:ro
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
 
 services:
-  # MinIO S3-compatible storage for testing
-  minio:
-    image: minio/minio:latest
-    container_name: minio-e2e
+  # FTP server for testing
+  ftp-server:
+    image: fauria/vsftpd
+    container_name: ftp-e2e
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin123
+      FTP_USER: ftpuser
+      FTP_PASS: ftppass123
+      PASV_ADDRESS: 127.0.0.1
+      PASV_MIN_PORT: 21100
+      PASV_MAX_PORT: 21110
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "21:21"
+      - "21100-21110:21100-21110"
     volumes:
-      - minio-data:/data
-    command: server /data --console-address ":9001"
+      - ftp-data:/home/vsftpd
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      test: ["CMD-SHELL", "netstat -an | grep :21 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # MySQL database for Gitea
+  # MySQL database for Gitea  
   gitea-db-e2e:
     image: mysql:8.0
-    container_name: gitea-db-e2e
+    container_name: gitea-db-e2e-ftp
     environment:
       MYSQL_ROOT_PASSWORD: gitea123
       MYSQL_DATABASE: gitea
@@ -32,7 +54,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - db-data:/var/lib/mysql
+      - db-data-ftp:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pgitea123"]
       interval: 10s
@@ -41,8 +63,8 @@ services:
 
   # Gitea service
   gitea-e2e:
-    image: gitea/gitea:1.21
-    container_name: gitea-e2e
+    <<: *gitea-common
+    container_name: gitea-e2e-ftp
     environment:
       - GITEA__database__DB_TYPE=mysql
       - GITEA__database__HOST=gitea-db-e2e:3306
@@ -55,35 +77,25 @@ services:
       - GITEA__service__REQUIRE_SIGNIN_VIEW=false
       - USER_UID=1000
       - USER_GID=1000
-    ports:
-      - "3000:3000"
-    volumes:
-      - gitea-data:/data
-      - ./tests/e2e/gitea-config/app.ini:/data/gitea/conf/app.ini
     depends_on:
       gitea-db-e2e:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
 
   # Backup/Restore testing container
   gitea-backup-e2e:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: gitea-backup-e2e
+    container_name: gitea-backup-e2e-ftp
     environment:
       # Backup configuration
       BACKUP_ENABLE: "true"
-      BACKUP_METHODE: "s3"
-      ENDPOINT_URL: "http://minio:9000"
-      AWS_ACCESS_KEY_ID: "minioadmin"
-      AWS_SECRET_ACCESS_KEY: "minioadmin123"
-      BUCKET: "gitea-backup"
-      BACKUP_PREFIX: "e2e-test"
+      BACKUP_METHODE: "ftp"
+      FTP_SERVER: "ftp-server"
+      FTP_PORT: "21"
+      FTP_USERNAME: "ftpuser"
+      FTP_PASSWORD: "ftppass123"
+      BACKUP_PREFIX: "e2e-test-ftp"
       BACKUP_MAX_RETENTION: "3"
       # Gitea configuration
       APP_INI_PATH: "/data/gitea/conf/app.ini"
@@ -93,11 +105,11 @@ services:
     depends_on:
       gitea-e2e:
         condition: service_healthy
-      minio:
+      ftp-server:
         condition: service_healthy
     command: ["sleep", "infinity"]
 
 volumes:
-  minio-data:
-  db-data:
+  ftp-data:
+  db-data-ftp:
   gitea-data:
