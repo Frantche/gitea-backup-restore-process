@@ -41,12 +41,20 @@ jobs:
         run: go mod download
 
       - name: Run tests
-        run: go test -v ./...
+        run: go test -v ./... -short
+
+      - name: Run integration tests
+        run: go test -v ./tests/integration/...
 
       - name: Build binaries
         run: |
           go build -o bin/gitea-backup ./cmd/gitea-backup
           go build -o bin/gitea-restore ./cmd/gitea-restore
+
+      - name: Run E2E tests
+        run: |
+          chmod +x tests/e2e/local_e2e_test.sh
+          ./tests/e2e/local_e2e_test.sh
 
       - name: Test build
         run: |

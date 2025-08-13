@@ -1,6 +1,9 @@
 # Multi-stage build for Go application
 FROM golang:1.24-alpine AS builder
 
+# Install ca-certificates
+RUN apk add --no-cache ca-certificates git
+
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download

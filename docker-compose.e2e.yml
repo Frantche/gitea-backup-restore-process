@@ -1,0 +1,103 @@
+version: "3.9"
+
+services:
+  # MinIO S3-compatible storage for testing
+  minio:
+    image: minio/minio:latest
+    container_name: minio-e2e
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # MySQL database for Gitea
+  gitea-db-e2e:
+    image: mysql:8.0
+    container_name: gitea-db-e2e
+    environment:
+      MYSQL_ROOT_PASSWORD: gitea123
+      MYSQL_DATABASE: gitea
+      MYSQL_USER: gitea
+      MYSQL_PASSWORD: gitea123
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pgitea123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Gitea service
+  gitea-e2e:
+    image: gitea/gitea:1.21
+    container_name: gitea-e2e
+    environment:
+      - GITEA__database__DB_TYPE=mysql
+      - GITEA__database__HOST=gitea-db-e2e:3306
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=gitea
+      - GITEA__database__PASSWD=gitea123
+      - GITEA__security__INSTALL_LOCK=true
+      - GITEA__security__SECRET_KEY=e2e-test-secret-key-for-testing-only
+      - GITEA__service__DISABLE_REGISTRATION=false
+      - GITEA__service__REQUIRE_SIGNIN_VIEW=false
+      - USER_UID=1000
+      - USER_GID=1000
+    ports:
+      - "3000:3000"
+    volumes:
+      - gitea-data:/data
+      - ./tests/e2e/gitea-config/app.ini:/data/gitea/conf/app.ini
+    depends_on:
+      gitea-db-e2e:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Backup/Restore testing container
+  gitea-backup-e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gitea-backup-e2e
+    environment:
+      # Backup configuration
+      BACKUP_ENABLE: "true"
+      BACKUP_METHODE: "s3"
+      ENDPOINT_URL: "http://minio:9000"
+      AWS_ACCESS_KEY_ID: "minioadmin"
+      AWS_SECRET_ACCESS_KEY: "minioadmin123"
+      BUCKET: "gitea-backup"
+      BACKUP_PREFIX: "e2e-test"
+      BACKUP_MAX_RETENTION: "3"
+      # Gitea configuration
+      APP_INI_PATH: "/data/gitea/conf/app.ini"
+    volumes:
+      - gitea-data:/data
+      - ./tests/e2e/gitea-config:/etc/gitea-config:ro
+    depends_on:
+      gitea-e2e:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: ["sleep", "infinity"]
+
+volumes:
+  minio-data:
+  db-data:
+  gitea-data:
