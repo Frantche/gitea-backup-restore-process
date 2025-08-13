@@ -10,7 +10,7 @@ cd "$(dirname "$0")/../.."
 # Define cleanup function
 cleanup() {
     echo "🧹 Cleaning up..."
-    docker-compose -f docker-compose.e2e.yml down -v --remove-orphans 2>/dev/null || true
+    docker compose -f docker-compose.e2e.yml down -v --remove-orphans 2>/dev/null || true
 }
 
 # Set trap to cleanup on exit
@@ -22,7 +22,7 @@ docker build -t gitea-backup-e2e .
 
 # Start services
 echo "🏃 Starting services..."
-docker-compose -f docker-compose.e2e.yml up -d
+docker compose -f docker-compose.e2e.yml up -d
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to initialize..."
@@ -30,7 +30,7 @@ sleep 60
 
 # Check if services are running
 echo "📋 Checking service status..."
-docker-compose -f docker-compose.e2e.yml ps
+docker compose -f docker-compose.e2e.yml ps
 
 # Setup MinIO bucket
 echo "📦 Setting up MinIO bucket..."

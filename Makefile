@@ -60,8 +60,8 @@ clean: ## Clean build artifacts and test data
 	@echo "🧹 Cleaning up..."
 	@rm -f bin/gitea-backup bin/gitea-restore
 	@rm -rf /tmp/gitea-e2e-test
-	@docker-compose -f docker-compose.e2e.yml down -v --remove-orphans 2>/dev/null || true
-	@docker-compose -f docker-compose.e2e.postgres.yml down -v --remove-orphans 2>/dev/null || true
-	@docker-compose -f docker-compose.e2e.ftp.yml down -v --remove-orphans 2>/dev/null || true
-	@docker-compose -f docker-compose.e2e.postgres-ftp.yml down -v --remove-orphans 2>/dev/null || true
+	@docker compose -f docker-compose.e2e.yml down -v --remove-orphans 2>/dev/null || true
+	@docker compose -f docker-compose.e2e.postgres.yml down -v --remove-orphans 2>/dev/null || true
+	@docker compose -f docker-compose.e2e.ftp.yml down -v --remove-orphans 2>/dev/null || true
+	@docker compose -f docker-compose.e2e.postgres-ftp.yml down -v --remove-orphans 2>/dev/null || true
 	@echo "✅ Cleanup completed"

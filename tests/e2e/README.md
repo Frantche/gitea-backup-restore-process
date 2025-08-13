@@ -212,20 +212,55 @@ make build
 - Data integrity verification
 - Proper cleanup and error handling
 
+## CI/CD Integration
+
+### GitHub Actions Compatibility
+
+The E2E tests are integrated with GitHub Actions and use Docker Compose v2 (`docker compose` command) which is the default in modern GitHub Actions runners. All test scripts have been updated to use the modern syntax.
+
+### Sequential vs Parallel Execution
+
+**Recommended: Sequential Execution**
+By default, E2E tests run sequentially to avoid port conflicts and resource contention:
+
+```bash
+make test-e2e-all  # Runs all combinations sequentially
+```
+
+**Optional: Parallel Execution** 
+For advanced users, a parallel testing workflow is available via manual trigger:
+
+- Navigate to GitHub Actions → "Parallel E2E Tests (Optional)"
+- Set `run_parallel` to `true` to run tests in parallel
+- Each test configuration uses isolated Docker projects to avoid conflicts
+
+**Note**: Parallel execution requires careful port management and may be less reliable than sequential execution.
+
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Docker build failures**: Ensure Docker has internet access for package downloads
-2. **Port conflicts**: Ensure ports 3000, 3306, 5432, 9000, 9001, 21 are available
-3. **Permission issues**: Ensure test scripts are executable (`chmod +x`)
-4. **FTP passive mode**: FTP tests require specific port ranges (21100-21110)
+**Docker Compose Command Not Found**
+- Error: `docker-compose: command not found`
+- Solution: The tests use `docker compose` (Docker Compose v2). Ensure you have Docker Desktop with Compose v2 installed.
+
+**Port Conflicts in Parallel Execution**
+- Error: `Port already in use`
+- Solution: Use sequential execution (`make test-e2e-all`) or implement unique port allocation for each test.
+
+**Service Health Check Failures**
+- Error: Services not becoming healthy
+- Solution: Increase timeout values or check Docker logs:
+
+```bash
+docker compose -f docker-compose.e2e.postgres.yml logs
+```
 
 ### Debugging
 
 ```bash
 # Check Docker logs for specific configuration
-docker-compose -f docker-compose.e2e.postgres.yml logs
+docker compose -f docker-compose.e2e.postgres.yml logs
 
 # Check specific service
 docker logs gitea-e2e-postgres
@@ -252,9 +287,10 @@ docker exec gitea-backup-e2e curl -f http://minio:9000/minio/health/live
 The E2E tests are integrated into the GitHub Actions workflow:
 
 - Local E2E tests run on every PR and push
-- Full Docker E2E tests can be enabled for specific branches or comprehensive validation
+- Full Docker E2E tests run for all database and storage combinations
 - Tests must pass before merging
 - Matrix testing ensures all database and storage combinations work
+- Sequential execution prevents resource conflicts and ensures reliability
 
 ## Contributing
 

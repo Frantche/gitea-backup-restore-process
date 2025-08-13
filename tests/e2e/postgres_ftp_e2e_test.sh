@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.e2e.postgres-ftp.yml"
+COMPOSE_FILE="${PROJECT_ROOT}/docker compose.e2e.postgres-ftp.yml"
 
 echo "🧪 Starting E2E test with PostgreSQL + FTP..."
 
@@ -15,7 +15,7 @@ echo "🧪 Starting E2E test with PostgreSQL + FTP..."
 cleanup() {
     echo "🧹 Cleaning up..."
     cd "${PROJECT_ROOT}"
-    docker-compose -f "${COMPOSE_FILE}" down -v --remove-orphans 2>/dev/null || true
+    docker compose -f "${COMPOSE_FILE}" down -v --remove-orphans 2>/dev/null || true
     docker system prune -f --volumes 2>/dev/null || true
 }
 
@@ -26,21 +26,21 @@ trap cleanup EXIT
 cd "${PROJECT_ROOT}"
 
 echo "📦 Building services..."
-docker-compose -f "${COMPOSE_FILE}" build --no-cache
+docker compose -f "${COMPOSE_FILE}" build --no-cache
 
 echo "🚀 Starting services..."
-docker-compose -f "${COMPOSE_FILE}" up -d
+docker compose -f "${COMPOSE_FILE}" up -d
 
 echo "⏳ Waiting for services to be healthy..."
 # Wait for all services to be healthy
 timeout 300 bash -c '
     while true; do
-        if docker-compose -f "'"${COMPOSE_FILE}"'" ps | grep -q "unhealthy\|starting"; then
+        if docker compose -f "'"${COMPOSE_FILE}"'" ps | grep -q "unhealthy\|starting"; then
             echo "Services still starting..."
             sleep 10
             continue
         fi
-        if ! docker-compose -f "'"${COMPOSE_FILE}"'" ps | grep -q "(healthy)"; then
+        if ! docker compose -f "'"${COMPOSE_FILE}"'" ps | grep -q "(healthy)"; then
             echo "Some services not healthy yet..."
             sleep 10
             continue

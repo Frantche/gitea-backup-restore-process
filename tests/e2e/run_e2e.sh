@@ -7,7 +7,7 @@ echo "🚀 Starting Gitea Backup/Restore E2E Tests"
 # Define cleanup function
 cleanup() {
     echo "🧹 Cleaning up..."
-    docker-compose -f docker-compose.e2e.yml down -v --remove-orphans || true
+    docker compose -f docker compose.e2e.yml down -v --remove-orphans || true
     docker volume prune -f || true
 }
 
@@ -23,7 +23,7 @@ docker build -t gitea-backup-e2e .
 
 # Start services
 echo "🏃 Starting services..."
-docker-compose -f docker-compose.e2e.yml up -d
+docker compose -f docker compose.e2e.yml up -d
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to start..."

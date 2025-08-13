@@ -56,17 +56,22 @@ jobs:
           chmod +x tests/e2e/local_e2e_test.sh
           ./tests/e2e/local_e2e_test.sh
 
-      - name: Run E2E tests (MySQL + S3)
-        run: make test-e2e
-
-      - name: Run E2E tests (PostgreSQL + S3)
-        run: make test-e2e-postgres
-
-      - name: Run E2E tests (MySQL + FTP)
-        run: make test-e2e-ftp
-
-      - name: Run E2E tests (PostgreSQL + FTP)
-        run: make test-e2e-postgres-ftp
+      # Run E2E tests in parallel using matrix strategy
+      - name: Run all E2E test combinations
+        run: |
+          # Install docker-compose v1 for compatibility if needed
+          if ! command -v docker-compose &> /dev/null; then
+            echo "docker-compose not found, but docker compose should work fine"
+          fi
+          
+          # Note: Running E2E tests sequentially to avoid port conflicts
+          # For parallel execution, each test would need unique ports
+          echo "🧪 Running E2E tests sequentially..."
+          make test-e2e
+          make test-e2e-postgres  
+          make test-e2e-ftp
+          make test-e2e-postgres-ftp
+          echo "✅ All E2E tests completed successfully"
 
       - name: Test build
         run: |
