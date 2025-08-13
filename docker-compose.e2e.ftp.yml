@@ -1,0 +1,105 @@
+version: "3.9"
+
+services:
+  # FTP server for testing
+  ftp-server:
+    image: fauria/vsftpd
+    container_name: ftp-e2e
+    environment:
+      FTP_USER: ftpuser
+      FTP_PASS: ftppass123
+      PASV_ADDRESS: 127.0.0.1
+      PASV_MIN_PORT: 21100
+      PASV_MAX_PORT: 21110
+    ports:
+      - "21:21"
+      - "21100-21110:21100-21110"
+    volumes:
+      - ftp-data:/home/vsftpd
+    healthcheck:
+      test: ["CMD-SHELL", "netstat -an | grep :21 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MySQL database for Gitea  
+  gitea-db-e2e-ftp:
+    image: mysql:8.0
+    container_name: gitea-db-e2e-ftp
+    environment:
+      MYSQL_ROOT_PASSWORD: gitea123
+      MYSQL_DATABASE: gitea
+      MYSQL_USER: gitea
+      MYSQL_PASSWORD: gitea123
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data-ftp:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pgitea123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Gitea service with MySQL
+  gitea-e2e-ftp:
+    image: gitea/gitea:1.21
+    container_name: gitea-e2e-ftp
+    environment:
+      - GITEA__database__DB_TYPE=mysql
+      - GITEA__database__HOST=gitea-db-e2e-ftp:3306
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=gitea
+      - GITEA__database__PASSWD=gitea123
+      - GITEA__security__INSTALL_LOCK=true
+      - GITEA__security__SECRET_KEY=e2e-test-secret-key-for-testing-only
+      - GITEA__service__DISABLE_REGISTRATION=false
+      - GITEA__service__REQUIRE_SIGNIN_VIEW=false
+      - USER_UID=1000
+      - USER_GID=1000
+    ports:
+      - "3000:3000"
+    volumes:
+      - gitea-data-ftp:/data
+      - ./tests/e2e/gitea-config/app.ini:/data/gitea/conf/app.ini
+    depends_on:
+      gitea-db-e2e-ftp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Backup/Restore testing container with FTP
+  gitea-backup-e2e-ftp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gitea-backup-e2e-ftp
+    environment:
+      # Backup configuration
+      BACKUP_ENABLE: "true"
+      BACKUP_METHODE: "ftp"
+      BACKUP_FTP_HOST: "ftp-server:21"
+      BACKUP_FTP_USER: "ftpuser"
+      BACKUP_FTP_PASSWORD: "ftppass123"
+      BACKUP_FTP_DIR: "/ftpuser"
+      BACKUP_PREFIX: "e2e-test-ftp"
+      BACKUP_MAX_RETENTION: "3"
+      # Gitea configuration
+      APP_INI_PATH: "/data/gitea/conf/app.ini"
+    volumes:
+      - gitea-data-ftp:/data
+      - ./tests/e2e/gitea-config:/etc/gitea-config:ro
+    depends_on:
+      gitea-e2e-ftp:
+        condition: service_healthy
+      ftp-server:
+        condition: service_healthy
+    command: ["sleep", "infinity"]
+
+volumes:
+  ftp-data:
+  db-data-ftp:
+  gitea-data-ftp:

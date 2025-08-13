@@ -1,8 +1,8 @@
-.PHONY: help build test test-unit test-integration test-e2e test-e2e-local clean
+.PHONY: help build test test-unit test-integration test-e2e test-e2e-local test-e2e-postgres test-e2e-ftp test-e2e-postgres-ftp clean
 
 help: ## Display this help message
 	@echo "Available targets:"
-	@awk 'BEGIN {FS = ": ## "} /^[a-zA-Z0-9_-]+: ## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ": ## "} /^[a-zA-Z0-9_-]+: ## / {printf "  %-25s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build the backup and restore binaries
 	@echo "🔨 Building binaries..."
@@ -29,15 +29,39 @@ test-e2e-local: ## Run local E2E tests
 	@./tests/e2e/local_e2e_test.sh
 	@echo "✅ Local E2E tests completed"
 
-test-e2e: ## Run full E2E tests with Docker
+test-e2e: ## Run full E2E tests with MySQL + S3
 	$(MAKE) build
-	@echo "🧪 Running full E2E tests..."
+	@echo "🧪 Running full E2E tests (MySQL + S3)..."
 	@./tests/e2e/basic_e2e_test.sh
 	@echo "✅ Full E2E tests completed"
+
+test-e2e-postgres: ## Run E2E tests with PostgreSQL + S3
+	$(MAKE) build
+	@echo "🧪 Running E2E tests (PostgreSQL + S3)..."
+	@./tests/e2e/postgres_e2e_test.sh
+	@echo "✅ PostgreSQL + S3 E2E tests completed"
+
+test-e2e-ftp: ## Run E2E tests with MySQL + FTP
+	$(MAKE) build
+	@echo "🧪 Running E2E tests (MySQL + FTP)..."
+	@./tests/e2e/ftp_e2e_test.sh
+	@echo "✅ MySQL + FTP E2E tests completed"
+
+test-e2e-postgres-ftp: ## Run E2E tests with PostgreSQL + FTP
+	$(MAKE) build
+	@echo "🧪 Running E2E tests (PostgreSQL + FTP)..."
+	@./tests/e2e/postgres_ftp_e2e_test.sh
+	@echo "✅ PostgreSQL + FTP E2E tests completed"
+
+test-e2e-all: ## Run all E2E test combinations
+test-e2e-all: test-e2e test-e2e-postgres test-e2e-ftp test-e2e-postgres-ftp
 
 clean: ## Clean build artifacts and test data
 	@echo "🧹 Cleaning up..."
 	@rm -f bin/gitea-backup bin/gitea-restore
 	@rm -rf /tmp/gitea-e2e-test
 	@docker-compose -f docker-compose.e2e.yml down -v --remove-orphans 2>/dev/null || true
+	@docker-compose -f docker-compose.e2e.postgres.yml down -v --remove-orphans 2>/dev/null || true
+	@docker-compose -f docker-compose.e2e.ftp.yml down -v --remove-orphans 2>/dev/null || true
+	@docker-compose -f docker-compose.e2e.postgres-ftp.yml down -v --remove-orphans 2>/dev/null || true
 	@echo "✅ Cleanup completed"

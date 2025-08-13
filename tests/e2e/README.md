@@ -4,14 +4,33 @@ This directory contains end-to-end tests for the Gitea backup and restore proces
 
 ## Overview
 
-The E2E testing infrastructure validates the complete backup and restore workflow:
+The E2E testing infrastructure validates the complete backup and restore workflow across multiple database and storage combinations:
 
-1. **Environment Setup**: Launches Gitea, MySQL database, and S3-compatible storage (MinIO)
+1. **Environment Setup**: Launches Gitea with various database backends and storage options
 2. **Data Creation**: Creates test repositories and issues
 3. **Backup Process**: Performs a complete backup operation
 4. **Data Loss Simulation**: Simulates system failure by clearing data
 5. **Restore Process**: Restores from backup
 6. **Verification**: Validates that data was successfully restored
+
+## Supported Test Configurations
+
+### Database Backends
+- **MySQL 8.0**: Default relational database
+- **PostgreSQL 15**: Alternative relational database
+
+### Storage Backends
+- **S3 (MinIO)**: S3-compatible object storage
+- **FTP**: Traditional file transfer protocol
+
+### Test Matrix
+
+| Configuration | Database | Storage | Test Command |
+|---------------|----------|---------|--------------|
+| Default       | MySQL    | S3      | `make test-e2e` |
+| PostgreSQL    | PostgreSQL | S3    | `make test-e2e-postgres` |
+| FTP           | MySQL    | FTP     | `make test-e2e-ftp` |
+| Full Alt      | PostgreSQL | FTP   | `make test-e2e-postgres-ftp` |
 
 ## Test Scripts
 
@@ -34,7 +53,7 @@ make test-e2e-local
 
 ### Basic E2E Test (`basic_e2e_test.sh`)
 
-A comprehensive test using Docker Compose to create a full Gitea environment.
+A comprehensive test using Docker Compose to create a full Gitea environment with MySQL + S3.
 
 **Usage:**
 ```bash
@@ -43,21 +62,56 @@ make test-e2e
 ./tests/e2e/basic_e2e_test.sh
 ```
 
-**What it tests:**
-- Docker environment setup
-- Service connectivity (Gitea, MySQL, MinIO)
-- Backup command execution in containerized environment
-- Integration between services
+### PostgreSQL E2E Test (`postgres_e2e_test.sh`)
 
-### Full E2E Test (`e2e_test.go`)
-
-A complete Go-based test that performs the full backup/restore cycle with data validation.
+Tests PostgreSQL database backend with S3 storage.
 
 **Usage:**
 ```bash
-cd tests/e2e
-go run e2e_test.go
+make test-e2e-postgres
+# or
+./tests/e2e/postgres_e2e_test.sh
 ```
+
+### FTP E2E Test (`ftp_e2e_test.sh`)
+
+Tests FTP storage backend with MySQL database.
+
+**Usage:**
+```bash
+make test-e2e-ftp
+# or
+./tests/e2e/ftp_e2e_test.sh
+```
+
+### PostgreSQL + FTP E2E Test (`postgres_ftp_e2e_test.sh`)
+
+Tests the combination of PostgreSQL database with FTP storage.
+
+**Usage:**
+```bash
+make test-e2e-postgres-ftp
+# or
+./tests/e2e/postgres_ftp_e2e_test.sh
+```
+
+### All E2E Tests
+
+Run all test combinations:
+
+```bash
+make test-e2e-all
+```
+
+### Full E2E Test (`e2e_test.go`)
+
+A complete Go-based test that performs the full backup/restore cycle with data validation. This test is configurable and used by all the Docker-based test scripts.
+
+**Configuration via environment variables:**
+- `GITEA_URL`: Gitea service URL (default: http://localhost:3000)
+- `CONTAINER_NAME`: Backup container name  
+- `DATA_VOLUME_NAME`: Gitea data volume name
+- `GITEA_CONTAINER_NAME`: Gitea container name
 
 **What it tests:**
 - Complete workflow from data creation to restoration
@@ -67,19 +121,26 @@ go run e2e_test.go
 
 ## Infrastructure
 
-### Docker Compose (`docker-compose.e2e.yml`)
+### Docker Compose Files
 
-Defines a complete testing environment with:
+Multiple compose files for different test scenarios:
 
-- **Gitea**: Latest version with MySQL backend
-- **MySQL**: Database for Gitea
-- **MinIO**: S3-compatible storage for backups
+- `docker-compose.e2e.yml`: MySQL + S3 (default)
+- `docker-compose.e2e.postgres.yml`: PostgreSQL + S3
+- `docker-compose.e2e.ftp.yml`: MySQL + FTP
+- `docker-compose.e2e.postgres-ftp.yml`: PostgreSQL + FTP
+
+Each defines a complete testing environment with:
+
+- **Gitea**: Latest version with appropriate database backend
+- **Database**: MySQL 8.0 or PostgreSQL 15
+- **Storage**: MinIO (S3) or vsftpd (FTP)
 - **Backup Container**: Built from project Dockerfile
 
 ### Configuration
 
 - `gitea-config/app.ini`: Gitea configuration for E2E testing
-- Environment variables for backup/restore settings
+- Environment variables for backup/restore settings specific to each test scenario
 
 ## Running Tests
 
@@ -95,11 +156,17 @@ Defines a complete testing environment with:
 # Run all tests
 make test
 
-# Run just E2E tests
+# Run just local E2E tests
 make test-e2e-local
 
-# Run full Docker-based E2E tests (requires Docker)
-make test-e2e
+# Run specific configuration tests
+make test-e2e              # MySQL + S3
+make test-e2e-postgres     # PostgreSQL + S3  
+make test-e2e-ftp          # MySQL + FTP
+make test-e2e-postgres-ftp # PostgreSQL + FTP
+
+# Run all E2E test combinations
+make test-e2e-all
 
 # Clean up
 make clean
@@ -111,50 +178,73 @@ make clean
 # Build binaries
 make build
 
-# Run local E2E test
-./tests/e2e/local_e2e_test.sh
-
-# Run Docker-based E2E test
-./tests/e2e/basic_e2e_test.sh
+# Run specific test
+./tests/e2e/postgres_e2e_test.sh
+./tests/e2e/ftp_e2e_test.sh
+./tests/e2e/postgres_ftp_e2e_test.sh
 ```
 
 ## Test Scenarios
 
-### Scenario 1: SQLite Backup/Restore
-- Creates SQLite-based Gitea instance
-- Performs file-based backup
-- Simulates data loss
-- Restores from backup
+### Scenario 1: Default (MySQL + S3)
+- Uses MySQL 8.0 database
+- Uses MinIO S3-compatible storage
+- Tests standard deployment pattern
 
-### Scenario 2: MySQL Backup/Restore
-- Uses MySQL database
-- Performs database dump + file backup
-- Validates MySQL restore functionality
+### Scenario 2: PostgreSQL + S3
+- Uses PostgreSQL 15 database
+- Uses MinIO S3-compatible storage
+- Tests PostgreSQL backup/restore functionality
 
-### Scenario 3: S3 Storage
-- Uses MinIO as S3-compatible storage
-- Tests remote backup storage
-- Validates download and restore from S3
+### Scenario 3: MySQL + FTP
+- Uses MySQL 8.0 database
+- Uses vsftpd FTP server
+- Tests FTP upload/download functionality
+
+### Scenario 4: PostgreSQL + FTP
+- Uses PostgreSQL 15 database
+- Uses vsftpd FTP server
+- Tests full alternative stack
+
+### All Scenarios Include:
+- Database-specific backup methods (mysqldump/pg_dump)
+- Storage-specific upload/download
+- Data integrity verification
+- Proper cleanup and error handling
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **Docker build failures**: Ensure Docker has internet access for package downloads
-2. **Port conflicts**: Ensure ports 3000, 3306, 9000, 9001 are available
+2. **Port conflicts**: Ensure ports 3000, 3306, 5432, 9000, 9001, 21 are available
 3. **Permission issues**: Ensure test scripts are executable (`chmod +x`)
+4. **FTP passive mode**: FTP tests require specific port ranges (21100-21110)
 
 ### Debugging
 
 ```bash
-# Check Docker logs
-docker-compose -f docker-compose.e2e.yml logs
+# Check Docker logs for specific configuration
+docker-compose -f docker-compose.e2e.postgres.yml logs
 
 # Check specific service
-docker logs gitea-e2e
+docker logs gitea-e2e-postgres
 
 # Run tests with debug output
-BACKUP_LOG_LEVEL=debug ./tests/e2e/basic_e2e_test.sh
+BACKUP_LOG_LEVEL=debug ./tests/e2e/postgres_e2e_test.sh
+```
+
+### Service-Specific Debugging
+
+```bash
+# PostgreSQL connection test
+docker exec gitea-db-e2e-postgres pg_isready -U gitea -d gitea
+
+# FTP connection test  
+docker exec gitea-backup-e2e-ftp nc -w 5 ftp-server 21
+
+# MinIO S3 health check
+docker exec gitea-backup-e2e curl -f http://minio:9000/minio/health/live
 ```
 
 ## Integration with CI
@@ -162,14 +252,17 @@ BACKUP_LOG_LEVEL=debug ./tests/e2e/basic_e2e_test.sh
 The E2E tests are integrated into the GitHub Actions workflow:
 
 - Local E2E tests run on every PR and push
-- Full Docker E2E tests can be enabled for specific branches
+- Full Docker E2E tests can be enabled for specific branches or comprehensive validation
 - Tests must pass before merging
+- Matrix testing ensures all database and storage combinations work
 
 ## Contributing
 
 When adding new E2E tests:
 
-1. Follow the existing naming convention
-2. Add appropriate cleanup in test scripts
+1. Follow the existing naming convention (`*_e2e_test.sh`)
+2. Add appropriate cleanup in test scripts (use trap for cleanup functions)
 3. Update this documentation
 4. Ensure tests are deterministic and can run in parallel
+5. Add new docker-compose files for new service combinations
+6. Update Makefile with new test targets

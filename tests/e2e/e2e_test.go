@@ -38,21 +38,48 @@ type GiteaIssue struct {
 
 // E2ETest manages the end-to-end testing process
 type E2ETest struct {
-	giteaURL    string
-	accessToken string
-	username    string
-	repoName    string
-	httpClient  *http.Client
+	giteaURL           string
+	accessToken        string
+	username           string
+	repoName           string
+	containerName      string
+	dataVolumeName     string
+	giteaContainerName string
+	httpClient         *http.Client
 }
 
 func main() {
 	logger.Info("Starting Gitea backup/restore E2E test")
 
+	// Get configuration from environment variables
+	giteaURL := os.Getenv("GITEA_URL")
+	if giteaURL == "" {
+		giteaURL = "http://localhost:3000"
+	}
+
+	containerName := os.Getenv("CONTAINER_NAME")
+	if containerName == "" {
+		containerName = "gitea-backup-e2e"
+	}
+
+	dataVolumeName := os.Getenv("DATA_VOLUME_NAME")
+	if dataVolumeName == "" {
+		dataVolumeName = "gitea-backup-restore-process_gitea-data"
+	}
+
+	giteaContainerName := os.Getenv("GITEA_CONTAINER_NAME")
+	if giteaContainerName == "" {
+		giteaContainerName = "gitea-e2e"
+	}
+
 	test := &E2ETest{
-		giteaURL:   "http://localhost:3000",
-		username:   "e2euser",
-		repoName:   "e2e-test-repo",
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		giteaURL:           giteaURL,
+		username:           "e2euser",
+		repoName:           "e2e-test-repo",
+		containerName:      containerName,
+		dataVolumeName:     dataVolumeName,
+		giteaContainerName: giteaContainerName,
+		httpClient:         &http.Client{Timeout: 30 * time.Second},
 	}
 
 	if err := test.runE2ETest(); err != nil {
@@ -296,7 +323,7 @@ func (t *E2ETest) performBackup() error {
 	logger.Info("Performing backup...")
 
 	// Execute backup command in the backup container
-	cmd := exec.Command("docker", "exec", "gitea-backup-e2e", "gitea-backup")
+	cmd := exec.Command("docker", "exec", t.containerName, "gitea-backup")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("backup command failed: %w\nOutput: %s", err, string(output))
@@ -311,19 +338,19 @@ func (t *E2ETest) simulateDataLoss() error {
 	logger.Info("Simulating data loss...")
 
 	// Stop Gitea service
-	cmd := exec.Command("docker", "stop", "gitea-e2e")
+	cmd := exec.Command("docker", "stop", t.giteaContainerName)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to stop Gitea: %w", err)
 	}
 
 	// Clear Gitea data volume
-	cmd = exec.Command("docker", "volume", "rm", "-f", "gitea-backup-restore-process_gitea-data")
+	cmd = exec.Command("docker", "volume", "rm", "-f", t.dataVolumeName)
 	if err := cmd.Run(); err != nil {
 		logger.Debugf("Warning: failed to remove gitea-data volume: %v", err)
 	}
 
 	// Restart Gitea service
-	cmd = exec.Command("docker", "start", "gitea-e2e")
+	cmd = exec.Command("docker", "start", t.giteaContainerName)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to restart Gitea: %w", err)
 	}
@@ -339,7 +366,7 @@ func (t *E2ETest) performRestore() error {
 	logger.Info("Performing restore...")
 
 	// Get the latest backup file name
-	cmd := exec.Command("docker", "exec", "gitea-backup-e2e", "sh", "-c", "ls -t /tmp/backup*.zip 2>/dev/null | head -1 || echo ''")
+	cmd := exec.Command("docker", "exec", t.containerName, "sh", "-c", "ls -t /tmp/backup*.zip 2>/dev/null | head -1 || echo ''")
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to find backup file: %w", err)
@@ -347,12 +374,12 @@ func (t *E2ETest) performRestore() error {
 
 	backupFile := strings.TrimSpace(string(output))
 	if backupFile == "" {
-		// Try to find backup in MinIO or use environment variable approach
-		logger.Info("No local backup file found, attempting restore from S3...")
+		// Try to find backup in storage or use environment variable approach
+		logger.Info("No local backup file found, attempting restore from storage...")
 	}
 
 	// Execute restore command in the backup container
-	cmd = exec.Command("docker", "exec", "gitea-backup-e2e", "gitea-restore")
+	cmd = exec.Command("docker", "exec", t.containerName, "gitea-restore")
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("restore command failed: %w\nOutput: %s", err, string(output))
