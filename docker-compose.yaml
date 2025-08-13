@@ -22,7 +22,7 @@ services:
       BACKUP_MAX_RETENTION: 3
       BUCKET: gitea-backup
   gitea-db:
-      image: mariadb:10.4.12
+      image: mariadb:12.0.2
       container_name: gitea-db
       restart: always
       environment:
