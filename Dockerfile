@@ -10,7 +10,7 @@ RUN go build -o bin/gitea-backup ./cmd/gitea-backup && \
     go build -o bin/gitea-restore ./cmd/gitea-restore
 
 # Final runtime image - using Ubuntu for better package availability
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 # Install necessary database clients and tools
 RUN apt-get update && apt-get install -y \
