@@ -1,49 +1,11 @@
-# Common configurations
-x-gitea-common: &gitea-common
-  image: gitea/gitea:1.21
-  environment:
-    - GITEA__security__INSTALL_LOCK=true
-    - GITEA__security__SECRET_KEY=e2e-test-secret-key-for-testing-only
-    - GITEA__service__DISABLE_REGISTRATION=false
-    - GITEA__service__REQUIRE_SIGNIN_VIEW=false
-    - USER_UID=1000
-    - USER_GID=1000
-  ports:
-    - "3000:3000"
-  volumes:
-    - gitea-data:/data
-    - ./tests/e2e/gitea-config/app.postgres.ini:/data/gitea/conf/app.ini:ro
-    - ./tests/e2e/gitea-config:/etc/gitea-config:ro
-  healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost:3000/"]
-    interval: 10s
-    timeout: 5s
-    retries: 10
+# E2E Testing: PostgreSQL + S3 Configuration
+# This file defines only the services needed for PostgreSQL database with S3 storage testing
 
 services:
-  # MinIO S3-compatible storage for testing
-  minio:
-    image: minio/minio:latest
-    container_name: minio-e2e-postgres
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin123
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio-data-postgres:/data
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-
   # PostgreSQL database for Gitea
-  gitea-db-e2e-postgres:
+  gitea-db-postgres:
     image: postgres:15
-    container_name: gitea-db-e2e-postgres
+    container_name: gitea-db-postgres
     environment:
       POSTGRES_DB: gitea
       POSTGRES_USER: gitea
@@ -51,20 +13,20 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - db-data-postgres:/var/lib/postgresql/data
+      - db-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U gitea -d gitea"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Gitea service
-  gitea-e2e:
-    <<: *gitea-common
-    container_name: gitea-e2e-postgres
+  # Gitea with PostgreSQL
+  gitea-postgres:
+    image: gitea/gitea:1.21
+    container_name: gitea-postgres
     environment:
       - GITEA__database__DB_TYPE=postgres
-      - GITEA__database__HOST=gitea-db-e2e-postgres:5432
+      - GITEA__database__HOST=gitea-db-postgres:5432
       - GITEA__database__NAME=gitea
       - GITEA__database__USER=gitea
       - GITEA__database__PASSWD=gitea123
@@ -75,21 +37,51 @@ services:
       - GITEA__service__REQUIRE_SIGNIN_VIEW=false
       - USER_UID=1000
       - USER_GID=1000
+    ports:
+      - "3000:3000"
+    volumes:
+      - gitea-data:/data
+      - ./tests/e2e/gitea-config/app.postgres.ini:/data/gitea/conf/app.ini:ro
+      - ./tests/e2e/gitea-config:/etc/gitea-config:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     depends_on:
-      gitea-db-e2e-postgres:
+      gitea-db-postgres:
         condition: service_healthy
 
-  # Backup/Restore testing container
-  gitea-backup-e2e:
+  # MinIO S3-compatible storage
+  s3:
+    image: minio/minio:latest
+    container_name: minio-e2e
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Base backup/restore process
+  gitea-backup-restore:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: gitea-backup-e2e-postgres
+    container_name: gitea-backup-e2e
     environment:
-      # Backup configuration
+      # Backup configuration for S3
       BACKUP_ENABLE: "true"
       BACKUP_METHODE: "s3"
-      ENDPOINT_URL: "http://minio:9000"
+      ENDPOINT_URL: "http://s3:9000"
       AWS_ACCESS_KEY_ID: "minioadmin"
       AWS_SECRET_ACCESS_KEY: "minioadmin123"
       BUCKET: "gitea-backup"
@@ -101,14 +93,14 @@ services:
       - gitea-data:/data
       - ./tests/e2e/gitea-config:/etc/gitea-config:ro
       - ./tests:/tests:ro
-    depends_on:
-      gitea-e2e:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
     command: ["sleep", "infinity"]
+    depends_on:
+      gitea-postgres:
+        condition: service_healthy
+      s3:
+        condition: service_healthy
 
 volumes:
-  minio-data-postgres:
-  db-data-postgres:
+  minio-data:
+  db-postgres-data:
   gitea-data:

@@ -1,36 +1,26 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
+	"code.gitea.io/sdk/gitea"
 	"github.com/Frantche/gitea-backup-restore-process/pkg/logger"
 )
-
-// GiteaUser represents a Gitea user
-type GiteaUser struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	FullName string `json:"full_name"`
-}
 
 // E2ETest manages the end-to-end testing process
 type E2ETest struct {
 	giteaURL           string
-	accessToken        string
 	username           string
+	password           string
 	repoName           string
 	containerName      string
 	dataVolumeName     string
 	giteaContainerName string
-	httpClient         *http.Client
+	giteaClient        *gitea.Client
 }
 
 func main() {
@@ -60,11 +50,11 @@ func main() {
 	test := &E2ETest{
 		giteaURL:           giteaURL,
 		username:           "e2euser",
+		password:           "e2epassword",
 		repoName:           "e2e-test-repo",
 		containerName:      containerName,
 		dataVolumeName:     dataVolumeName,
 		giteaContainerName: giteaContainerName,
-		httpClient:         &http.Client{Timeout: 30 * time.Second},
 	}
 
 	if err := test.runE2ETest(); err != nil {
@@ -120,14 +110,15 @@ func (t *E2ETest) waitForServices() error {
 	// Wait for Gitea
 	maxRetries := 30
 	for i := 0; i < maxRetries; i++ {
-		resp, err := t.httpClient.Get(t.giteaURL + "/api/healthz")
-		if err == nil && resp.StatusCode == 200 {
-			resp.Body.Close()
-			logger.Info("Gitea is ready")
-			break
-		}
-		if resp != nil {
-			resp.Body.Close()
+		// Try to create a basic Gitea client to test connectivity
+		client, err := gitea.NewClient(t.giteaURL)
+		if err == nil {
+			// Test basic connectivity
+			_, _, err = client.ServerVersion()
+			if err == nil {
+				logger.Info("Gitea is ready")
+				break
+			}
 		}
 
 		if i == maxRetries-1 {
@@ -138,7 +129,7 @@ func (t *E2ETest) waitForServices() error {
 		time.Sleep(10 * time.Second)
 	}
 
-	// Wait for MinIO (check via Gitea backup container)
+	// Wait for other services
 	time.Sleep(5 * time.Second)
 	logger.Info("All services are ready")
 	return nil
@@ -147,111 +138,92 @@ func (t *E2ETest) waitForServices() error {
 func (t *E2ETest) initializeGitea() error {
 	logger.Info("Initializing Gitea...")
 
-	// First check if already initialized
-	resp, err := t.httpClient.Get(t.giteaURL + "/api/v1/version")
-	if err == nil && resp.StatusCode == 200 {
-		resp.Body.Close()
-		logger.Info("Gitea is already initialized")
-		return t.createUserAndToken()
-	}
-	if resp != nil {
-		resp.Body.Close()
-	}
-
-	// Initialize Gitea through install endpoint
-	installData := map[string]interface{}{
-		"db_type":           "mysql",
-		"db_host":           "gitea-db-e2e:3306",
-		"db_user":           "gitea",
-		"db_passwd":         "gitea123",
-		"db_name":           "gitea",
-		"app_name":          "Gitea E2E Test",
-		"admin_name":        t.username,
-		"admin_passwd":      "e2epassword",
-		"admin_confirm_passwd": "e2epassword",
-		"admin_email":       "e2e@example.com",
-	}
-
-	jsonData, _ := json.Marshal(installData)
-	req, err := http.NewRequest("POST", t.giteaURL+"/", bytes.NewBuffer(jsonData))
+	// Create Gitea client with basic authentication
+	client, err := gitea.NewClient(t.giteaURL, gitea.SetBasicAuth(t.username, t.password))
 	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err = t.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-
-	// Wait a bit for initialization to complete
-	time.Sleep(10 * time.Second)
-
-	return t.createUserAndToken()
-}
-
-func (t *E2ETest) createUserAndToken() error {
-	// Create access token for API calls
-	tokenData := map[string]string{
-		"name": "e2e-test-token",
+		return fmt.Errorf("failed to create Gitea client: %w", err)
 	}
 
-	jsonData, _ := json.Marshal(tokenData)
-
-	// Try to create token using basic auth first
-	req, err := http.NewRequest("POST", t.giteaURL+"/api/v1/users/"+t.username+"/tokens", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(t.username, "e2epassword")
-
-	resp, err := t.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 201 {
-		var tokenResp map[string]interface{}
-		if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-			return err
-		}
-		t.accessToken = tokenResp["sha1"].(string)
-		logger.Info("Access token created successfully")
+	// Test if we can connect and the user exists
+	_, _, err = client.GetMyUserInfo()
+	if err == nil {
+		logger.Info("Gitea is already initialized and user is available")
+		t.giteaClient = client
 		return nil
 	}
 
-	// If token creation failed, assume user already exists and try to use a predefined token approach
-	// For E2E testing, we'll use a simpler approach - just use basic auth
-	logger.Info("Using basic authentication for API calls")
+	// If connection failed, try without authentication to check if Gitea is initialized
+	basicClient, err := gitea.NewClient(t.giteaURL)
+	if err != nil {
+		return fmt.Errorf("failed to create basic Gitea client: %w", err)
+	}
+
+	// Check if Gitea is already set up by getting version
+	_, _, err = basicClient.ServerVersion()
+	if err != nil {
+		logger.Info("Gitea appears to need initialization, waiting for auto-setup...")
+		time.Sleep(30 * time.Second) // Wait for auto-initialization
+	}
+
+	// Try to authenticate with the expected user
+	client, err = gitea.NewClient(t.giteaURL, gitea.SetBasicAuth(t.username, t.password))
+	if err != nil {
+		return fmt.Errorf("failed to create authenticated Gitea client: %w", err)
+	}
+
+	// Test authentication
+	_, _, err = client.GetMyUserInfo()
+	if err != nil {
+		logger.Info("User authentication failed, assuming user will be created during Gitea setup")
+		// For E2E testing, we'll rely on external setup or Docker initialization
+		time.Sleep(10 * time.Second)
+		
+		// Try once more
+		_, _, err = client.GetMyUserInfo()
+		if err != nil {
+			return fmt.Errorf("failed to authenticate with Gitea after initialization: %w", err)
+		}
+	}
+
+	t.giteaClient = client
+	logger.Info("Gitea client initialized successfully")
 	return nil
 }
 
 func (t *E2ETest) createTestData() error {
-	logger.Info("Creating test data using bootstrap script...")
+	logger.Info("Creating test data using Gitea SDK...")
 
-	// Use the gitea_bootstrap.sh script to create repository and issue
-	bootstrapScript := "/tests/e2e/gitea_bootstrap.sh"
-	args := []string{
-		bootstrapScript,
-		t.giteaURL,
-		t.username,
-		"e2epassword",
-		t.repoName,
-		"E2E Test Issue",
-		"This is a test issue created for end-to-end testing of backup and restore functionality.",
+	if t.giteaClient == nil {
+		return fmt.Errorf("Gitea client not initialized")
 	}
 
-	cmd := exec.Command("bash", args...)
-	output, err := cmd.CombinedOutput()
+	// Create repository
+	repoOptions := gitea.CreateRepoOption{
+		Name:          t.repoName,
+		Private:       false,
+		AutoInit:      true,
+		DefaultBranch: "main",
+	}
+
+	repo, _, err := t.giteaClient.CreateRepo(repoOptions)
 	if err != nil {
-		return fmt.Errorf("bootstrap script failed: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("failed to create repository: %w", err)
 	}
 
-	logger.Info("Test data created successfully using bootstrap script")
-	logger.Debugf("Bootstrap output: %s", string(output))
+	logger.Infof("Repository created: %s", repo.FullName)
+
+	// Create issue
+	issueOptions := gitea.CreateIssueOption{
+		Title: "E2E Test Issue",
+		Body:  "This is a test issue created for end-to-end testing of backup and restore functionality.",
+	}
+
+	issue, _, err := t.giteaClient.CreateIssue(t.username, t.repoName, issueOptions)
+	if err != nil {
+		return fmt.Errorf("failed to create issue: %w", err)
+	}
+
+	logger.Infof("Issue created: #%d - %s", issue.Index, issue.Title)
 	return nil
 }
 
@@ -339,43 +311,22 @@ func (t *E2ETest) verifyRestoration() error {
 		return fmt.Errorf("failed to reinitialize after restore: %w", err)
 	}
 
+	if t.giteaClient == nil {
+		return fmt.Errorf("Gitea client not available")
+	}
+
 	// Verify repository exists
-	req, err := http.NewRequest("GET", t.giteaURL+"/api/v1/repos/"+t.username+"/"+t.repoName, nil)
+	repo, _, err := t.giteaClient.GetRepo(t.username, t.repoName)
 	if err != nil {
-		return err
+		return fmt.Errorf("repository not found after restore: %w", err)
 	}
-	req.SetBasicAuth(t.username, "e2epassword")
 
-	resp, err := t.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("repository not found after restore: status %d", resp.StatusCode)
-	}
+	logger.Infof("Repository verified: %s", repo.FullName)
 
 	// Verify issue exists
-	req, err = http.NewRequest("GET", t.giteaURL+"/api/v1/repos/"+t.username+"/"+t.repoName+"/issues", nil)
+	issues, _, err := t.giteaClient.ListRepoIssues(t.username, t.repoName, gitea.ListIssueOption{})
 	if err != nil {
-		return err
-	}
-	req.SetBasicAuth(t.username, "e2epassword")
-
-	resp, err = t.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("failed to get issues after restore: status %d", resp.StatusCode)
-	}
-
-	var issues []map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&issues); err != nil {
-		return err
+		return fmt.Errorf("failed to get issues after restore: %w", err)
 	}
 
 	if len(issues) == 0 {
@@ -385,8 +336,9 @@ func (t *E2ETest) verifyRestoration() error {
 	// Check if our test issue exists
 	found := false
 	for _, issue := range issues {
-		if title, ok := issue["title"].(string); ok && title == "E2E Test Issue" {
+		if issue.Title == "E2E Test Issue" {
 			found = true
+			logger.Infof("Test issue verified: #%d - %s", issue.Index, issue.Title)
 			break
 		}
 	}

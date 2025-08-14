@@ -2,7 +2,7 @@
 
 set -e
 
-echo "🧪 Running basic E2E test for Gitea backup/restore"
+echo "🧪 Running MySQL + S3 E2E test for Gitea backup/restore"
 
 # Ensure we're in the right directory
 cd "$(dirname "$0")/../.."
@@ -42,7 +42,7 @@ if curl -f http://localhost:3000/ > /dev/null 2>&1; then
     echo "✅ Gitea is accessible"
 else
     echo "❌ Gitea is not accessible"
-    docker logs gitea-e2e
+    docker logs gitea-mysql
     exit 1
 fi
 
@@ -54,23 +54,31 @@ else
     exit 1
 fi
 
-# Test backup functionality (basic test)
-echo "💾 Testing backup functionality..."
-docker exec gitea-backup-e2e sh -c "ls -la /data && echo 'Gitea data directory:' && ls -la /data/gitea || echo 'No gitea directory yet'"
-
 # Initialize Gitea with a simple admin user
 echo "👤 Initializing Gitea admin user..."
-docker exec gitea-e2e gitea admin user create --admin --username admin --password admin123 --email admin@example.com || echo "Admin user might already exist"
+docker exec gitea-mysql gitea admin user create --admin --username e2euser --password e2epassword --email e2e@example.com || echo "Admin user might already exist"
 
-# Test a simple backup operation
-echo "💾 Performing test backup..."
-if docker exec gitea-backup-e2e gitea-backup; then
-    echo "✅ Backup command executed successfully"
+# Build and run the E2E test outside of the container
+echo "🔧 Building E2E test binary..."
+cd tests/e2e
+go build -o e2e-test ./e2e.go
+cd ../..
+
+# Set environment variables for the E2E test
+export GITEA_URL="http://localhost:3000"
+export CONTAINER_NAME="gitea-backup-e2e"
+export DATA_VOLUME_NAME="docker-compose.e2e.mysql.s3_gitea-data"
+export GITEA_CONTAINER_NAME="gitea-mysql"
+
+# Run the comprehensive E2E test
+echo "🧪 Running comprehensive E2E test..."
+if ./tests/e2e/e2e-test; then
+    echo "✅ Comprehensive E2E test completed successfully!"
 else
-    echo "❌ Backup command failed"
+    echo "❌ E2E test failed"
     docker logs gitea-backup-e2e
+    docker logs gitea-mysql
     exit 1
 fi
 
-echo "✅ Basic E2E test completed successfully!"
-echo "🎉 All services are working and backup command can be executed"
+echo "🎉 MySQL + S3 E2E test completed successfully!"

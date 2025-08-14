@@ -67,9 +67,9 @@ jobs:
           # Note: Running E2E tests sequentially to avoid port conflicts
           # For parallel execution, each test would need unique ports
           echo "🧪 Running E2E tests sequentially..."
-          make test-e2e
-          make test-e2e-postgres  
-          make test-e2e-ftp
+          make test-e2e-mysql-s3
+          make test-e2e-postgres-s3  
+          make test-e2e-mysql-ftp
           make test-e2e-postgres-ftp
           echo "✅ All E2E tests completed successfully"
 

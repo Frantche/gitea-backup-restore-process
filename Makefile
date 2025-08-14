@@ -1,4 +1,4 @@
-.PHONY: help build test test-unit test-integration test-e2e test-e2e-local test-e2e-postgres test-e2e-ftp test-e2e-postgres-ftp clean
+.PHONY: help build test test-unit test-integration test-e2e-mysql-s3 test-e2e-local test-e2e-postgres-s3 test-e2e-mysql-ftp test-e2e-postgres-ftp clean
 
 help: ## Display this help message
 	@echo "Available targets:"
@@ -29,19 +29,19 @@ test-e2e-local: ## Run local E2E tests
 	@./tests/e2e/local_e2e_test.sh
 	@echo "✅ Local E2E tests completed"
 
-test-e2e: ## Run full E2E tests with MySQL + S3
+test-e2e-mysql-s3: ## Run E2E tests with MySQL + S3
 	$(MAKE) build
-	@echo "🧪 Running full E2E tests (MySQL + S3)..."
+	@echo "🧪 Running E2E tests (MySQL + S3)..."
 	@./tests/e2e/e2e.mysql.s3.sh
-	@echo "✅ Full E2E tests completed"
+	@echo "✅ MySQL + S3 E2E tests completed"
 
-test-e2e-postgres: ## Run E2E tests with PostgreSQL + S3
+test-e2e-postgres-s3: ## Run E2E tests with PostgreSQL + S3
 	$(MAKE) build
 	@echo "🧪 Running E2E tests (PostgreSQL + S3)..."
 	@./tests/e2e/e2e.postgres.s3.sh
 	@echo "✅ PostgreSQL + S3 E2E tests completed"
 
-test-e2e-ftp: ## Run E2E tests with MySQL + FTP
+test-e2e-mysql-ftp: ## Run E2E tests with MySQL + FTP
 	$(MAKE) build
 	@echo "🧪 Running E2E tests (MySQL + FTP)..."
 	@./tests/e2e/e2e.mysql.ftp.sh
@@ -54,7 +54,7 @@ test-e2e-postgres-ftp: ## Run E2E tests with PostgreSQL + FTP
 	@echo "✅ PostgreSQL + FTP E2E tests completed"
 
 test-e2e-all: ## Run all E2E test combinations
-test-e2e-all: test-e2e test-e2e-postgres test-e2e-ftp test-e2e-postgres-ftp
+test-e2e-all: test-e2e-mysql-s3 test-e2e-postgres-s3 test-e2e-mysql-ftp test-e2e-postgres-ftp
 
 clean: ## Clean build artifacts and test data
 	@echo "🧹 Cleaning up..."
