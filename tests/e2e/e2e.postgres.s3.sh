@@ -9,14 +9,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.e2e.postgres.s3.yml"
 
-echo "🧪 Starting E2E test with PostgreSQL + S3..."
+echo "🧪 Starting PostgreSQL + S3 E2E test for Gitea backup/restore..."
 
 # Cleanup function
 cleanup() {
     echo "🧹 Cleaning up..."
     cd "${PROJECT_ROOT}"
     docker compose -f "${COMPOSE_FILE}" down -v --remove-orphans 2>/dev/null || true
-    docker system prune -f --volumes 2>/dev/null || true
 }
 
 # Set trap for cleanup
@@ -25,48 +24,70 @@ trap cleanup EXIT
 # Change to project root
 cd "${PROJECT_ROOT}"
 
-echo "📦 Building services..."
-docker compose -f "${COMPOSE_FILE}" build --no-cache
+echo "🔨 Building Docker image..."
+docker build -t gitea-backup-e2e .
 
 echo "🚀 Starting services..."
 docker compose -f "${COMPOSE_FILE}" up -d
 
-echo "⏳ Waiting for services to be healthy..."
-# Wait for all services to be healthy
-timeout 300 bash -c '
-    while true; do
-        if docker compose -f "'"${COMPOSE_FILE}"'" ps | grep -q "unhealthy\|starting"; then
-            echo "Services still starting..."
-            sleep 10
-            continue
-        fi
-        if ! docker compose -f "'"${COMPOSE_FILE}"'" ps | grep -q "(healthy)"; then
-            echo "Some services not healthy yet..."
-            sleep 10
-            continue
-        fi
-        break
-    done
-'
+echo "⏳ Waiting for services to initialize..."
+sleep 60
 
-echo "✅ All services are healthy"
+# Check if services are running
+echo "📋 Checking service status..."
+docker compose -f "${COMPOSE_FILE}" ps
+
+# Setup MinIO bucket
+echo "📦 Setting up MinIO bucket..."
+docker exec minio-e2e sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin123 && mc mb local/gitea-backup" || echo "Bucket might already exist"
+
+# Test basic connectivity
+echo "🌐 Testing service connectivity..."
+if curl -f http://localhost:3000/ > /dev/null 2>&1; then
+    echo "✅ Gitea is accessible"
+else
+    echo "❌ Gitea is not accessible"
+    docker logs gitea-postgres
+    exit 1
+fi
+
+if curl -f http://localhost:9000/minio/health/live > /dev/null 2>&1; then
+    echo "✅ MinIO is accessible"
+else
+    echo "❌ MinIO is not accessible"
+    docker logs minio-e2e
+    exit 1
+fi
 
 # Check that PostgreSQL is working
 echo "🔍 Verifying PostgreSQL connection..."
-docker exec gitea-db-e2e-postgres pg_isready -U gitea -d gitea
+docker exec gitea-db-postgres pg_isready -U gitea -d gitea
 
-# Check that MinIO is working
-echo "🔍 Verifying MinIO S3 connectivity..."
-docker exec gitea-backup-e2e-postgres curl -f http://minio:9000/minio/health/live
+# Initialize Gitea with a simple admin user
+echo "👤 Initializing Gitea admin user..."
+docker exec gitea-postgres gitea admin user create --admin --username e2euser --password e2epassword --email e2e@example.com || echo "Admin user might already exist"
 
-echo "🧪 Running E2E test..."
-# Run the E2E test in the backup container with PostgreSQL environment
-docker exec gitea-backup-e2e-postgres sh -c '
-    export GITEA_URL="http://gitea-e2e-postgres:3000"
-    export CONTAINER_NAME="gitea-backup-e2e-postgres"
-    export DATA_VOLUME_NAME="gitea-backup-restore-process_gitea-data-postgres"
-    export GITEA_CONTAINER_NAME="gitea-e2e-postgres"
-    cd /tests/e2e && go run e2e.go
-'
+# Build and run the E2E test outside of the container
+echo "🔧 Building E2E test binary..."
+cd tests/e2e
+go build -o e2e-test ./e2e.go
+cd ../..
 
-echo "✅ PostgreSQL + S3 E2E test completed successfully!"
+# Set environment variables for the E2E test
+export GITEA_URL="http://localhost:3000"
+export CONTAINER_NAME="gitea-backup-e2e"
+export DATA_VOLUME_NAME="docker-compose.e2e.postgres.s3_gitea-data"
+export GITEA_CONTAINER_NAME="gitea-postgres"
+
+# Run the comprehensive E2E test
+echo "🧪 Running comprehensive E2E test..."
+if ./tests/e2e/e2e-test; then
+    echo "✅ Comprehensive E2E test completed successfully!"
+else
+    echo "❌ E2E test failed"
+    docker logs gitea-backup-e2e
+    docker logs gitea-postgres
+    exit 1
+fi
+
+echo "🎉 PostgreSQL + S3 E2E test completed successfully!"
