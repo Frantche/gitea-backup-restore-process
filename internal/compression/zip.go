@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/Frantche/gitea-backup-restore-process/internal/config"
 	"github.com/Frantche/gitea-backup-restore-process/pkg/logger"
@@ -74,70 +75,96 @@ func CreateZip(settings *config.Settings) error {
 	return nil
 }
 
-// ExtractZip extracts a zip archive to the restore tmp folder
+const (
+	dirPerm  = 0o700 // rwx owner
+	filePerm = 0o700 // rwx owner (change to 0o600 if you want rw only for files)
+)
+
+var copyBufPool = sync.Pool{
+	New: func() any {
+		// 256 KiB buffer tends to perform well for zip streams
+		buf := make([]byte, 256<<10)
+		return buf
+	},
+}
+
+// ExtractZip extracts a zip archive to the restore tmp folder with rwx perms.
 func ExtractZip(settings *config.Settings) error {
 	logger.Info("Extracting zip archive")
-	
-	// Create restore tmp folder
-	if err := os.MkdirAll(settings.RestoreTmpFolder, 0755); err != nil {
+
+	// Ensure destination root exists with rwx
+	if err := os.MkdirAll(settings.RestoreTmpFolder, dirPerm); err != nil {
 		return fmt.Errorf("failed to create restore tmp folder: %w", err)
 	}
-	
-	zipReader, err := zip.OpenReader(settings.RestoreTmpFilename)
+	_ = os.Chmod(settings.RestoreTmpFolder, dirPerm)
+
+	zr, err := zip.OpenReader(settings.RestoreTmpFilename)
 	if err != nil {
 		return fmt.Errorf("failed to open zip file: %w", err)
 	}
-	defer zipReader.Close()
-	
-	// Extract files
-	for _, file := range zipReader.File {
-		err := extractFile(file, settings.RestoreTmpFolder)
-		if err != nil {
-			return fmt.Errorf("failed to extract file %s: %w", file.Name, err)
+	defer zr.Close()
+
+	base := filepath.Clean(settings.RestoreTmpFolder)
+	for _, f := range zr.File {
+		if err := extractFileRWX(f, base); err != nil {
+			return fmt.Errorf("failed to extract %s: %w", f.Name, err)
 		}
 	}
-	
+
 	logger.Info("Zip archive extracted successfully")
 	return nil
 }
 
-// extractFile extracts a single file from the zip archive
-func extractFile(file *zip.File, destDir string) error {
-	// Normalize path and prevent directory traversal
-	destPath := filepath.Join(destDir, file.Name)
-	if !strings.HasPrefix(destPath, filepath.Clean(destDir)+string(os.PathSeparator)) {
-		return fmt.Errorf("invalid file path: %s", file.Name)
+func extractFileRWX(f *zip.File, destDir string) error {
+	// Zip Slip prevention
+	dest := filepath.Join(destDir, f.Name)
+	if !strings.HasPrefix(dest, destDir+string(os.PathSeparator)) {
+		return fmt.Errorf("invalid file path: %s", f.Name)
 	}
-	
-	if file.FileInfo().IsDir() {
-		return os.MkdirAll(destPath, file.FileInfo().Mode())
+
+	mode := f.Mode()
+
+	// Directories
+	if f.FileInfo().IsDir() {
+		if err := os.MkdirAll(dest, dirPerm); err != nil {
+			return err
+		}
+		return os.Chmod(dest, dirPerm)
 	}
-	
-	// Create parent directories
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+
+	// Skip symlinks (safer default). If you need them, validate target then os.Symlink.
+	if mode&os.ModeSymlink != 0 {
+		logger.Debugf("Skipping symlink from zip: %s", f.Name)
+		return nil
+	}
+
+	// Ensure parent dir exists (with rwx)
+	if err := os.MkdirAll(filepath.Dir(dest), dirPerm); err != nil {
 		return err
 	}
-	
-	// Open file in zip
-	zipFile, err := file.Open()
+
+	rc, err := f.Open()
 	if err != nil {
 		return err
 	}
-	defer zipFile.Close()
-	
-	// Create destination file
-	destFile, err := os.Create(destPath)
+	defer rc.Close()
+
+	// Create file; set perms after write to override umask
+	out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, filePerm)
 	if err != nil {
 		return err
 	}
-	defer destFile.Close()
-	
-	// Copy content
-	_, err = io.Copy(destFile, zipFile)
-	if err != nil {
-		return err
+	buf := copyBufPool.Get().([]byte)
+	_, cpErr := io.CopyBuffer(out, rc, buf)
+	putErr := out.Close()
+	copyBufPool.Put(buf)
+	if cpErr != nil {
+		return cpErr
 	}
-	
-	// Set file permissions
-	return os.Chmod(destPath, file.FileInfo().Mode())
+	if putErr != nil {
+		return putErr
+	}
+
+	// Force desired perms (ensures rwx even if umask interfered)
+	return os.Chmod(dest, filePerm)
 }

@@ -1,0 +1,50 @@
+# E2E Testing: MySQL + FTP Configuration
+# This file defines only the services needed for MySQL database with FTP storage testing
+
+services:
+  # FTP server
+  ftp:
+    #restart: always
+    container_name: vsftpd-e2e
+    image: garethflowers/ftp-server:0.8.0
+    environment:
+      FTP_USER: ftpuser
+      FTP_PASS: ftppass123
+      PUBLIC_IP: 0.0.0.0
+      PASV_MIN_PORT: 40000
+      PASV_MAX_PORT: 40009
+    ports:
+      - "21:21"
+      - "40000-40009:40000-40009/tcp"
+    volumes:
+      - ftp-data:/home/ftpuser
+
+  # Base backup/restore process
+  gitea-backup-restore:
+    build:
+      context: ../.
+      dockerfile: Dockerfile
+    container_name: gitea-backup-e2e
+    user: "1000:1000"
+    environment:
+      # Backup configuration for FTP
+      BACKUP_ENABLE: "true"
+      BACKUP_METHODE: "ftp"
+      BACKUP_FTP_HOST: "ftp:21"
+      BACKUP_FTP_USER: "ftpuser"
+      BACKUP_FTP_PASSWORD: "ftppass123"
+      BACKUP_FTP_DIR: ""
+      BACKUP_PREFIX: "e2e-test-ftp"
+      BACKUP_MAX_RETENTION: "3"
+      # Gitea configuration
+      APP_INI_PATH: "/data/gitea/conf/app.ini"
+    volumes:
+      - gitea-data:/data
+    command: ["sleep", "infinity"]
+    depends_on:
+      gitea-mysql:
+        condition: service_healthy
+
+volumes:
+  ftp-data:
+  gitea-data:

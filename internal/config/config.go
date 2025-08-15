@@ -22,12 +22,13 @@ type Settings struct {
 	RestoreTmpFolder         string `yaml:"restore_tmp_folder"`
 	RestoreTmpFilename       string `yaml:"restore_tmp_filename"`
 	AppIniPath               string `yaml:"app_ini_path"`
+	giteaUser                string `yaml:"gitea_user"`
 }
 
 // NewSettings creates a new Settings instance with default values and environment overrides
 func NewSettings() (*Settings, error) {
 	settings := &Settings{
-		BackupFileLog:           "/data/backupFileLog.txt",
+		BackupFileLog:           "/data/gitea/backupFileLog.txt",
 		BackupTmpRemoteFilename: "@prefix-@date.zip",
 		BackupPrefix:            "gitea-backup",
 		BackupMaxRetention:      5,
@@ -36,6 +37,7 @@ func NewSettings() (*Settings, error) {
 		RestoreTmpFolder:        "/tmp/restore",
 		RestoreTmpFilename:      "/tmp/restore.zip",
 		AppIniPath:              "/data/gitea/conf/app.ini",
+		giteaUser:               "git",
 	}
 
 	// Load from environment variables
@@ -112,6 +114,10 @@ func (s *Settings) loadFromEnv() error {
 
 	if val := os.Getenv("APP_INI_PATH"); val != "" {
 		s.AppIniPath = val
+	}
+
+	if val := os.Getenv("GITEA_USER"); val != "" {
+		s.giteaUser = val
 	}
 
 	return nil

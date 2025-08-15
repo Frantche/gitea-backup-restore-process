@@ -29,7 +29,4 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /app/bin/gitea-backup /usr/local/bin/
 COPY --from=builder /app/bin/gitea-restore /usr/local/bin/
 
-# Create default directories
-RUN mkdir -p /data /tmp/backup /tmp/restore
-
 CMD [ "sleep", "infinity" ]
