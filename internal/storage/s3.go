@@ -30,6 +30,7 @@ type S3Config struct {
 	Prefix            string
 	SignatureVersion  string
 	Verify            bool
+	Region            string
 }
 
 // getS3Config reads S3 configuration from environment variables
@@ -43,6 +44,7 @@ func getS3Config() (*S3Config, error) {
 		Prefix:            os.Getenv("PREFIX"),
 		SignatureVersion:  "s3v4",
 		Verify:            true,
+		Region:            os.Getenv("REGION"),
 	}
 	
 	if os.Getenv("VERIFY") == "false" {
@@ -68,6 +70,7 @@ func (s *S3Backend) getClient() (*s3.Client, error) {
 	}
 	
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithRegion(s3Config.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			s3Config.AccessKeyID,
 			s3Config.SecretAccessKey,
@@ -82,6 +85,7 @@ func (s *S3Backend) getClient() (*s3.Client, error) {
 		BaseEndpoint: aws.String(s3Config.EndpointURL),
 		UsePathStyle: true,
 		Credentials:  cfg.Credentials,
+		Region:       s3Config.Region,
 	})
 	
 	return s.client, nil
@@ -105,6 +109,9 @@ func (s *S3Backend) ValidateConfig() error {
 	if s3Config.Bucket == "" {
 		return fmt.Errorf("BUCKET is required for S3 backend")
 	}
+	if s3Config.Region == "" {
+        return fmt.Errorf("REGION is required for S3 backend") // <-- Add this check
+    }
 	
 	return nil
 }

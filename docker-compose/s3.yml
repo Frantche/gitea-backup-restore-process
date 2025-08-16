@@ -32,12 +32,13 @@ services:
       # Backup configuration for S3
       BACKUP_ENABLE: "true"
       BACKUP_METHODE: "s3"
-      BACKUP_S3_ENDPOINT: "http://s3:9000"
-      BACKUP_S3_ACCESS_KEY_ID: "minioadmin"
-      BACKUP_S3_SECRET_ACCESS_KEY: "minioadmin123"
-      BACKUP_S3_BUCKET: "gitea-backup"
+      ENDPOINT_URL: "http://s3:9000"
+      AWS_ACCESS_KEY_ID: "minioadmin"
+      AWS_SECRET_ACCESS_KEY: "minioadmin123"
+      BUCKET: "gitea-backup"
       BACKUP_PREFIX: "e2e-test-s3"
       BACKUP_MAX_RETENTION: "3"
+      REGION: "us-east-1"
       # Gitea configuration
       APP_INI_PATH: "/data/gitea/conf/app.ini"
     volumes:

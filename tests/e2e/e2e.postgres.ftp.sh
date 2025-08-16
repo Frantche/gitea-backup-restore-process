@@ -24,9 +24,6 @@ trap cleanup EXIT
 # Change to project root
 cd "${PROJECT_ROOT}"
 
-echo "🔨 Building Docker image..."
-docker build -t gitea-backup-e2e .
-
 echo "Delete volume before starting E2E test"
 docker compose -f "${COMPOSE_FILE}" down
 docker volume ls -q | grep '^docker-compose' | xargs -r docker volume rm -f
@@ -40,12 +37,27 @@ docker compose -f "${COMPOSE_FILE}" ps
 
 # Test basic connectivity
 echo "🌐 Testing service connectivity..."
-if curl -f http://localhost:3000/ > /dev/null 2>&1; then
-    echo "✅ Gitea is accessible"
-else
-    echo "❌ Gitea is not accessible"
-    docker logs gitea-postgres
-    exit 1
+max_retries=10
+retry_interval=5
+attempt=1
+reachable=false
+
+while [ $attempt -le $max_retries ]; do
+    if curl -sf http://localhost:3000/ > /dev/null 2>&1; then
+        echo "✅ Gitea is accessible (attempt $attempt/$max_retries)"
+        reachable=true
+        break
+    else
+        echo "⏳ Attempt $attempt/$max_retries failed, retrying in ${retry_interval}s..."
+        sleep $retry_interval
+    fi
+    attempt=$((attempt+1))
+done
+
+if [ "$reachable" = false ]; then
+    echo "❌ Gitea is not accessible after $max_retries attempts"
+    docker logs gitea-mysql
+    exit 1   # exit with failure
 fi
 
 # Check that PostgreSQL is working
