@@ -1,5 +1,5 @@
-# E2E Testing: MySQL + FTP Configuration
-# This file defines only the services needed for MySQL database with FTP storage testing
+# E2E Testing: MySQL Configuration
+# This file defines the MySQL database and Gitea with MySQL
 
 services:
   # MySQL database for Gitea

@@ -1,10 +1,9 @@
-# E2E Testing: MySQL + FTP Configuration
-# This file defines only the services needed for MySQL database with FTP storage testing
+# E2E Testing: FTP Configuration
+# This file defines the FTP server and backup/restore container
 
 services:
   # FTP server
   ftp:
-    #restart: always
     container_name: vsftpd-e2e
     image: garethflowers/ftp-server:0.8.0
     environment:
@@ -42,8 +41,7 @@ services:
       - gitea-data:/data
     command: ["sleep", "infinity"]
     depends_on:
-      gitea-mysql:
-        condition: service_healthy
+      - ftp
 
 volumes:
   ftp-data:

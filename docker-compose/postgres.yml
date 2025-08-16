@@ -1,5 +1,5 @@
-# E2E Testing: PostgreSQL + FTP Configuration
-# This file defines only the services needed for PostgreSQL database with FTP storage testing
+# E2E Testing: PostgreSQL Configuration
+# This file defines the PostgreSQL database and Gitea with PostgreSQL
 
 services:
   # PostgreSQL database for Gitea
