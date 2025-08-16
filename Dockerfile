@@ -2,48 +2,44 @@
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
-# If you fetch private modules, uncomment the next line:
-# RUN apk add --no-cache git ca-certificates
+RUN apk add --no-cache ca-certificates
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN go build -o bin/gitea-backup ./cmd/gitea-backup && \
-    go build -o bin/gitea-restore ./cmd/gitea-restore
+ENV CGO_ENABLED=0
+RUN go build -trimpath -ldflags="-s -w" -o bin/gitea-backup ./cmd/gitea-backup && \
+    go build -trimpath -ldflags="-s -w" -o bin/gitea-restore ./cmd/gitea-restore
+
+# ---------- PostgreSQL 17 client stage ----------
+FROM postgres:17-alpine AS pgtools
 
 # ---------- Runtime stage ----------
-FROM ubuntu:24.04
+FROM alpine:3.22
+# Minimal tools + MariaDB CLI + runtime libs required by pg_dump/libpq
+RUN apk add --no-cache \
+      ca-certificates curl jq \
+      mariadb-client \
+      lz4-libs \
+      zstd-libs \
+      krb5-libs \
+      openldap \
+      libedit
 
-ARG DEBIAN_FRONTEND=noninteractive
-# Set the Postgres MAJOR you want. 15 matches your server (15.14).
-# Change to 16 if you want the newest major.
-ARG PG_MAJOR=17
+# Copy only what you need from PG17 (keeps size down)
+COPY --from=pgtools /usr/local/bin/pg_dump /usr/local/bin/
+COPY --from=pgtools /usr/local/bin/pg_restore /usr/local/bin/
+COPY --from=pgtools /usr/local/bin/psql /usr/local/bin/
 
-# Base tools + add the official PostgreSQL APT repo (PGDG) for up-to-date clients
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl gnupg lsb-release \
-    && install -d -m 0755 /etc/apt/keyrings \
-    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-         | gpg --dearmor -o /etc/apt/keyrings/postgresql.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release; echo ${VERSION_CODENAME})-pgdg main" \
-         > /etc/apt/sources.list.d/pgdg.list \
-    && apt-get update \
-    # Install database clients (pg_dump/psql from PGDG in the version you chose)
-    && apt-get install -y --no-install-recommends \
-         "postgresql-client-${PG_MAJOR}" \
-         mysql-client \
-         wget \
-         jq \
-         curl \
-    && apt-get purge -y gnupg lsb-release \
-    && rm -rf /var/lib/apt/lists/*
+# PG runtime libs/messages
+COPY --from=pgtools /usr/local/lib /usr/local/lib
+COPY --from=pgtools /usr/local/share/postgresql /usr/local/share/postgresql
 
-# Copy Go binaries from builder stage
+# Ensure dynamic linker finds PG libs first
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+# Your Go binaries (built in a previous stage)
 COPY --from=builder /app/bin/gitea-backup /usr/local/bin/
 COPY --from=builder /app/bin/gitea-restore /usr/local/bin/
 
-# Optional: show the installed pg_dump version at container start
-# (handy for debugging images)
-# CMD ["bash", "-lc", "pg_dump --version && sleep infinity"]
-
-CMD [ "sleep", "infinity" ]
+CMD ["sleep", "infinity"]
