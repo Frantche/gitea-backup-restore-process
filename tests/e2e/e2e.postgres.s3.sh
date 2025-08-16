@@ -60,7 +60,7 @@ done
 
 if [ "$reachable" = false ]; then
     echo "❌ Gitea is not accessible after $max_retries attempts"
-    docker logs gitea-mysql
+    docker logs gitea-db-postgres
     exit 1   # exit with failure
 fi
 

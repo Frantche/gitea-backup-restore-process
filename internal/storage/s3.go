@@ -110,7 +110,7 @@ func (s *S3Backend) ValidateConfig() error {
 		return fmt.Errorf("BUCKET is required for S3 backend")
 	}
 	if s3Config.Region == "" {
-        return fmt.Errorf("REGION is required for S3 backend") // <-- Add this check
+        return fmt.Errorf("REGION is required for S3 backend")
     }
 	
 	return nil
