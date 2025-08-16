@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,7 +18,7 @@ func TestE2EWorkflow(t *testing.T) {
 	}
 
 	// Create temporary directories for testing
-	tmpDir, err := ioutil.TempDir("", "gitea-e2e-test")
+	tmpDir, err := os.MkdirTemp("", "gitea-e2e-test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -55,7 +54,7 @@ func TestE2EWorkflow(t *testing.T) {
 	}
 
 	for path, content := range testFiles {
-		if err := ioutil.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 			t.Fatalf("Failed to create test file %s: %v", path, err)
 		}
 	}
@@ -74,7 +73,7 @@ AVATAR_UPLOAD_PATH = ` + avatarDir + `
 REPOSITORY_AVATAR_UPLOAD_PATH = ` + avatarDir + `
 `
 
-	if err := ioutil.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to create config file: %v", err)
 	}
 
@@ -152,7 +151,7 @@ REPOSITORY_AVATAR_UPLOAD_PATH = ` + avatarDir + `
 				continue // Skip database file for this test
 			}
 
-			content, err := ioutil.ReadFile(path)
+			content, err := os.ReadFile(path)
 			if err != nil {
 				t.Errorf("Failed to read restored file %s: %v", path, err)
 				continue
@@ -184,7 +183,7 @@ REPOSITORY_AVATAR_UPLOAD_PATH = ` + avatarDir + `
 
 		for path, content := range testFiles {
 			backupPath := filepath.Join(backupRepo, filepath.Base(path))
-			if err := ioutil.WriteFile(backupPath, []byte(content), 0644); err != nil {
+			if err := os.WriteFile(backupPath, []byte(content), 0644); err != nil {
 				t.Errorf("Failed to simulate backup of %s: %v", path, err)
 			}
 		}
@@ -206,13 +205,13 @@ REPOSITORY_AVATAR_UPLOAD_PATH = ` + avatarDir + `
 		// 5. Simulate restore by copying back from backup
 		for path, expectedContent := range testFiles {
 			backupPath := filepath.Join(backupRepo, filepath.Base(path))
-			content, err := ioutil.ReadFile(backupPath)
+			content, err := os.ReadFile(backupPath)
 			if err != nil {
 				t.Errorf("Failed to read backup file %s: %v", backupPath, err)
 				continue
 			}
 
-			if err := ioutil.WriteFile(path, content, 0644); err != nil {
+			if err := os.WriteFile(path, content, 0644); err != nil {
 				t.Errorf("Failed to restore file %s: %v", path, err)
 				continue
 			}
