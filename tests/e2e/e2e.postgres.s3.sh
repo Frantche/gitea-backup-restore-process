@@ -19,7 +19,7 @@ cleanup() {
 }
 
 # Set trap for cleanup
-#trap cleanup EXIT
+trap cleanup EXIT
 
 # Change to project root
 cd "${PROJECT_ROOT}"
