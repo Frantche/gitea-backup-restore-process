@@ -113,6 +113,26 @@ go build -o bin/gitea-restore ./cmd/gitea-restore
 go test ./...
 ```
 
+### End-to-End Testing
+
+The project includes comprehensive E2E tests that validate the complete backup and restore workflow:
+
+```bash
+# Run all tests including E2E
+make test
+
+# Run only E2E tests
+make test-e2e-local
+
+# Run integration tests
+make test-integration
+
+# Run full Docker-based E2E tests (requires Docker)
+make test-e2e
+```
+
+See [tests/e2e/README.md](tests/e2e/README.md) for detailed information about the E2E testing infrastructure.
+
 ### Building Docker Image
 
 ```bash

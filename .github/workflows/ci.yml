@@ -41,12 +41,37 @@ jobs:
         run: go mod download
 
       - name: Run tests
-        run: go test -v ./...
+        run: go test -v ./... -short
+
+      - name: Run integration tests
+        run: go test -v ./tests/integration/...
 
       - name: Build binaries
         run: |
           go build -o bin/gitea-backup ./cmd/gitea-backup
           go build -o bin/gitea-restore ./cmd/gitea-restore
+
+      - name: Run local E2E tests
+        run: |
+          chmod +x tests/e2e/local_e2e_test.sh
+          ./tests/e2e/local_e2e_test.sh
+
+      # Run E2E tests in parallel using matrix strategy
+      - name: Run all E2E test combinations
+        run: |
+          # Install docker-compose v1 for compatibility if needed
+          if ! command -v docker-compose &> /dev/null; then
+            echo "docker-compose not found, but docker compose should work fine"
+          fi
+          
+          # Note: Running E2E tests sequentially to avoid port conflicts
+          # For parallel execution, each test would need unique ports
+          echo "🧪 Running E2E tests sequentially..."
+          make test-e2e-mysql-s3
+          make test-e2e-postgres-s3  
+          make test-e2e-mysql-ftp
+          make test-e2e-postgres-ftp
+          echo "✅ All E2E tests completed successfully"
 
       - name: Test build
         run: |

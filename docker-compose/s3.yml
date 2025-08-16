@@ -1,0 +1,52 @@
+# E2E Testing: S3 Configuration
+# This file defines the S3 storage service and backup/restore container
+
+services:
+  # MinIO S3-compatible storage
+  s3:
+    image: minio/minio:latest
+    container_name: minio-e2e
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Base backup/restore process
+  gitea-backup-restore:
+    build:
+      context: ../.
+      dockerfile: Dockerfile
+    container_name: gitea-backup-e2e
+    user: "1000:1000"
+    environment:
+      # Backup configuration for S3
+      BACKUP_ENABLE: "true"
+      BACKUP_METHODE: "s3"
+      ENDPOINT_URL: "http://s3:9000"
+      AWS_ACCESS_KEY_ID: "minioadmin"
+      AWS_SECRET_ACCESS_KEY: "minioadmin123"
+      BUCKET: "gitea-backup"
+      BACKUP_PREFIX: "e2e-test-s3"
+      BACKUP_MAX_RETENTION: "3"
+      REGION: "us-east-1"
+      # Gitea configuration
+      APP_INI_PATH: "/data/gitea/conf/app.ini"
+    volumes:
+      - gitea-data:/data
+    command: ["sleep", "infinity"]
+    depends_on:
+      - s3
+
+volumes:
+  minio-data:
+  gitea-data:
