@@ -112,9 +112,6 @@ func (t *E2ETest) runE2ETest() error {
 		return fmt.Errorf("Error to fetch backup file name: %w", err)
 	}
 
-	if err := t.performBackup(); err != nil {
-		return fmt.Errorf("backup failed: %w", err)
-	}
 	// Step 5: Simulate failure by clearing data
 	if err := t.simulateDataLoss(); err != nil {
 		return fmt.Errorf("failed to simulate data loss: %w", err)
