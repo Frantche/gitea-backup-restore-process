@@ -62,6 +62,7 @@ All configuration is done through environment variables:
 | `AWS_ACCESS_KEY_ID` | AWS access key | `AKIAIOSFODNN7EXAMPLE` |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
 | `BUCKET` | S3 bucket name | `my-gitea-backups` |
+| `S3_LOG_DEBUG` | Enable S3 debug logging | `true` or `false` (default: `false`) |
 
 ### FTP Configuration
 

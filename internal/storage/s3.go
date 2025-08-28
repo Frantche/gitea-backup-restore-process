@@ -37,6 +37,7 @@ type S3Config struct {
 	SignatureVersion  string
 	Verify            bool
 	Region            string
+	LogDebug          bool
 }
 
 // getS3Config reads S3 configuration from environment variables
@@ -51,6 +52,7 @@ func getS3Config() (*S3Config, error) {
 		SignatureVersion:  "s3v4",
 		Verify:            true,
 		Region:            os.Getenv("REGION"),
+		LogDebug:          false,
 	}
 	
 	if os.Getenv("VERIFY") == "false" {
@@ -59,6 +61,10 @@ func getS3Config() (*S3Config, error) {
 	
 	if sv := os.Getenv("SIGNATURE_VERSION"); sv != "" {
 		s3Config.SignatureVersion = sv
+	}
+	
+	if os.Getenv("S3_LOG_DEBUG") == "true" {
+		s3Config.LogDebug = true
 	}
 	
 	return s3Config, nil
@@ -134,16 +140,30 @@ func (s *S3Backend) getClient() (*s3.Client, error) {
 		return nil, err
 	}
 	
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithRegion(s3Config.Region),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-			s3Config.AccessKeyID,
-			s3Config.SecretAccessKey,
-			"",
-		)),
-		config.WithLogger(logging.NewStandardLogger(os.Stderr)), // Add logger
-        config.WithClientLogMode(aws.LogRequestWithBody|aws.LogResponseWithBody|aws.LogRetries), // Enable detailed logs
-	)
+	var cfg aws.Config
+	if s3Config.LogDebug {
+		// Enable debug logging when S3_LOG_DEBUG=true
+		cfg, err = config.LoadDefaultConfig(context.TODO(),
+			config.WithRegion(s3Config.Region),
+			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+				s3Config.AccessKeyID,
+				s3Config.SecretAccessKey,
+				"",
+			)),
+			config.WithLogger(logging.NewStandardLogger(os.Stderr)),
+			config.WithClientLogMode(aws.LogRequestWithBody|aws.LogResponseWithBody|aws.LogRetries),
+		)
+	} else {
+		// Use standard logging when S3_LOG_DEBUG=false or not set
+		cfg, err = config.LoadDefaultConfig(context.TODO(),
+			config.WithRegion(s3Config.Region),
+			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+				s3Config.AccessKeyID,
+				s3Config.SecretAccessKey,
+				"",
+			)),
+		)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
