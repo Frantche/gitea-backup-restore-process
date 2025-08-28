@@ -64,9 +64,7 @@ func getS3Config() (*S3Config, error) {
 	return s3Config, nil
 }
 
-// ignoreSigningHeaders excludes the listed headers
-// from the request signature because some providers may alter them.
-//
+
 // See https://github.com/aws/aws-sdk-go-v2/issues/1816.
 func ignoreSigningHeaders(o *s3.Options, headers []string) {
     o.APIOptions = append(o.APIOptions, func(stack *middleware.Stack) error {
@@ -157,22 +155,13 @@ func (s *S3Backend) getClient() (*s3.Client, error) {
         Credentials:  cfg.Credentials,
         Region:       s3Config.Region,
 
-        // 🔑 évite aws-chunked + trailers
         RequestChecksumCalculation:  aws.RequestChecksumCalculationWhenRequired,
         ResponseChecksumValidation:  aws.ResponseChecksumValidationWhenRequired,
     }
 
-    // 🔑 ne pas signer Accept-Encoding (Cloudflare peut le modifier/supprimer)
     ignoreSigningHeaders(&opt, []string{"Accept-Encoding"})
 
     s.client = s3.New(opt)
-
-	/* s.client = s3.New(s3.Options{
-		BaseEndpoint: aws.String(s3Config.EndpointURL),
-		UsePathStyle: true,
-		Credentials:  cfg.Credentials,
-		Region:       s3Config.Region,
-	}) */
 	
 	return s.client, nil
 }
