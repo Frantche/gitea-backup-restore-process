@@ -15,7 +15,7 @@ import (
 
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/smithy-go/middleware"
-    smithyhttp "github.com/aws/smithy-go/transport/http"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 
 	appconfig "github.com/Frantche/gitea-backup-restore-process/internal/config"
 	"github.com/Frantche/gitea-backup-restore-process/pkg/logger"
