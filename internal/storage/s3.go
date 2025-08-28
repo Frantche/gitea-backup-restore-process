@@ -217,7 +217,7 @@ func (s *S3Backend) Upload(settings *appconfig.Settings) error {
 	})
 	
 	if err != nil {
-		return fmt.Errorf("failed to upload to S3: %w+v", err)
+		return fmt.Errorf("failed to upload to S3: %w", err)
 	}
 	
 	logger.Info("Upload to S3 successful")
