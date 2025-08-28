@@ -148,7 +148,7 @@ func (s *S3Backend) getClient() (*s3.Client, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 	
-	// Options S3
+	// S3 options
     opt := s3.Options{
         BaseEndpoint: aws.String(s3Config.EndpointURL),
         UsePathStyle: true,
