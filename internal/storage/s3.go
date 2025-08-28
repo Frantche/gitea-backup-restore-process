@@ -141,8 +141,8 @@ func (s *S3Backend) getClient() (*s3.Client, error) {
 			s3Config.SecretAccessKey,
 			"",
 		)),
-		config.WithLogger(logging.NewStandardLogger(os.Stderr)), // Ajoute ce logger
-        config.WithClientLogMode(aws.LogRequestWithBody|aws.LogResponseWithBody|aws.LogRetries), // Active logs détaillés
+		config.WithLogger(logging.NewStandardLogger(os.Stderr)), // Add logger
+        config.WithClientLogMode(aws.LogRequestWithBody|aws.LogResponseWithBody|aws.LogRetries), // Enable detailed logs
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
