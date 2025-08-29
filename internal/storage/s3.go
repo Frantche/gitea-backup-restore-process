@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -37,6 +38,7 @@ type S3Config struct {
 	SignatureVersion  string
 	Verify            bool
 	Region            string
+	LogDebug          bool
 }
 
 // getS3Config reads S3 configuration from environment variables
@@ -51,6 +53,7 @@ func getS3Config() (*S3Config, error) {
 		SignatureVersion:  "s3v4",
 		Verify:            true,
 		Region:            os.Getenv("REGION"),
+		LogDebug:          false,
 	}
 	
 	if os.Getenv("VERIFY") == "false" {
@@ -59,6 +62,14 @@ func getS3Config() (*S3Config, error) {
 	
 	if sv := os.Getenv("SIGNATURE_VERSION"); sv != "" {
 		s3Config.SignatureVersion = sv
+	}
+	
+	// Parse S3_LOG_DEBUG using strconv.ParseBool for better format support
+	if logDebugEnv := os.Getenv("S3_LOG_DEBUG"); logDebugEnv != "" {
+		if logDebug, err := strconv.ParseBool(logDebugEnv); err == nil {
+			s3Config.LogDebug = logDebug
+		}
+		// Invalid values default to false (already set above)
 	}
 	
 	return s3Config, nil
@@ -134,16 +145,25 @@ func (s *S3Backend) getClient() (*s3.Client, error) {
 		return nil, err
 	}
 	
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
+	// Base configuration options common to both debug and standard logging
+	configOptions := []func(*config.LoadOptions) error{
 		config.WithRegion(s3Config.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			s3Config.AccessKeyID,
 			s3Config.SecretAccessKey,
 			"",
 		)),
-		config.WithLogger(logging.NewStandardLogger(os.Stderr)), // Add logger
-        config.WithClientLogMode(aws.LogRequestWithBody|aws.LogResponseWithBody|aws.LogRetries), // Enable detailed logs
-	)
+	}
+	
+	// Add debug logging options if enabled
+	if s3Config.LogDebug {
+		configOptions = append(configOptions,
+			config.WithLogger(logging.NewStandardLogger(os.Stderr)),
+			config.WithClientLogMode(aws.LogRequestWithBody|aws.LogResponseWithBody|aws.LogRetries),
+		)
+	}
+	
+	cfg, err := config.LoadDefaultConfig(context.TODO(), configOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
