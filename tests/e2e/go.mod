@@ -3,7 +3,7 @@ module e2e-test
 go 1.25.3
 
 require (
-	code.gitea.io/sdk/gitea v0.22.0
+	code.gitea.io/sdk/gitea v0.22.1
 	github.com/Frantche/gitea-backup-restore-process v0.0.0
 )
 
