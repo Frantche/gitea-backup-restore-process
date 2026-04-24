@@ -12,7 +12,7 @@ RUN go build -o bin/gitea-backup ./cmd/gitea-backup && \
     go build -o bin/gitea-restore ./cmd/gitea-restore
 
 # ---------- Runtime stage ----------
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 # Set the Postgres MAJOR you want. 15 matches your server (15.14).
