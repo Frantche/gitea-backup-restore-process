@@ -1,6 +1,6 @@
 module e2e-test
 
-go 1.26.3
+go 1.26.4
 
 require (
 	code.gitea.io/sdk/gitea v0.25.1
