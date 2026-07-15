@@ -5,46 +5,73 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Frantche/gitea-backup-restore-process/internal/config"
 	"github.com/Frantche/gitea-backup-restore-process/pkg/logger"
 )
 
+const (
+	cleanTmpRemoveAttempts   = 5
+	cleanTmpRemoveRetryDelay = 100 * time.Millisecond
+)
+
 // CleanTmp cleans temporary directories and creates them fresh
 func CleanTmp(settings *config.Settings) error {
 	logger.Debug("Cleaning temporary directories")
-	
+
 	// Remove and recreate backup tmp folder
-	if err := os.RemoveAll(settings.BackupTmpFolder); err != nil {
+	if err := removeAllWithRetry(settings.BackupTmpFolder, os.RemoveAll, cleanTmpRemoveAttempts, cleanTmpRemoveRetryDelay); err != nil {
 		return fmt.Errorf("failed to remove backup tmp folder: %w", err)
 	}
 	if err := os.MkdirAll(settings.BackupTmpFolder, 0755); err != nil {
 		return fmt.Errorf("failed to create backup tmp folder: %w", err)
 	}
-	
+
 	// Remove backup tmp file if exists
 	if err := os.Remove(settings.BackupTmpFilename); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove backup tmp file: %w", err)
 	}
-	
+
 	// Remove and recreate restore tmp folder
-	if err := os.RemoveAll(settings.RestoreTmpFolder); err != nil {
+	if err := removeAllWithRetry(settings.RestoreTmpFolder, os.RemoveAll, cleanTmpRemoveAttempts, cleanTmpRemoveRetryDelay); err != nil {
 		return fmt.Errorf("failed to remove restore tmp folder: %w", err)
 	}
-	
+
 	// Remove restore tmp file if exists
 	if err := os.Remove(settings.RestoreTmpFilename); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove restore tmp file: %w", err)
 	}
-	
+
 	logger.Debug("Temporary directories cleaned successfully")
 	return nil
+}
+
+func removeAllWithRetry(path string, remove func(string) error, attempts int, delay time.Duration) error {
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	var err error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		err = remove(path)
+		if err == nil {
+			return nil
+		}
+
+		if attempt < attempts {
+			logger.Debugf("Failed to remove %s (attempt %d/%d): %v", path, attempt, attempts, err)
+			time.Sleep(delay)
+		}
+	}
+
+	return err
 }
 
 // BackupFiles backs up Gitea files (repositories, avatars, etc.)
 func BackupFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) error {
 	logger.Info("Starting file backup")
-	
+
 	// Backup repositories
 	if giteaConfig.Repository.Root != "" {
 		targetDir := filepath.Join(settings.BackupTmpFolder, "repo")
@@ -54,7 +81,7 @@ func BackupFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) err
 			logger.Debug("Repositories backed up successfully")
 		}
 	}
-	
+
 	// Backup avatars
 	if giteaConfig.Picture.AvatarUploadPath != "" {
 		targetDir := filepath.Join(settings.BackupTmpFolder, "avatars")
@@ -64,7 +91,7 @@ func BackupFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) err
 			logger.Debug("Avatars backed up successfully")
 		}
 	}
-	
+
 	// Backup repository avatars
 	if giteaConfig.Picture.RepositoryAvatarUploadPath != "" {
 		targetDir := filepath.Join(settings.BackupTmpFolder, "repo-avatars")
@@ -74,7 +101,7 @@ func BackupFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) err
 			logger.Debug("Repository avatars backed up successfully")
 		}
 	}
-	
+
 	logger.Info("File backup completed")
 	return nil
 }
@@ -82,7 +109,7 @@ func BackupFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) err
 // RestoreFiles restores Gitea files from backup
 func RestoreFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) error {
 	logger.Info("Starting file restore")
-	
+
 	// Restore repositories
 	sourceDir := filepath.Join(settings.RestoreTmpFolder, "repo")
 	if giteaConfig.Repository.Root != "" {
@@ -92,7 +119,7 @@ func RestoreFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) er
 			logger.Debug("Repositories restored successfully")
 		}
 	}
-	
+
 	// Restore avatars
 	sourceDir = filepath.Join(settings.RestoreTmpFolder, "avatars")
 	if giteaConfig.Picture.AvatarUploadPath != "" {
@@ -102,7 +129,7 @@ func RestoreFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) er
 			logger.Debug("Avatars restored successfully")
 		}
 	}
-	
+
 	// Restore repository avatars
 	sourceDir = filepath.Join(settings.RestoreTmpFolder, "repo-avatars")
 	if giteaConfig.Picture.RepositoryAvatarUploadPath != "" {
@@ -112,7 +139,7 @@ func RestoreFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) er
 			logger.Debug("Repository avatars restored successfully")
 		}
 	}
-	
+
 	logger.Info("File restore completed")
 	return nil
 }
@@ -128,25 +155,25 @@ func copyDir(src, dst string) error {
 		}
 		return err
 	}
-	
+
 	if !srcInfo.IsDir() {
 		return fmt.Errorf("source is not a directory: %s", src)
 	}
-	
+
 	// Create destination directory
 	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
 		return err
 	}
-	
+
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
-	
+
 	for _, entry := range entries {
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
-		
+
 		if entry.IsDir() {
 			if err := copyDir(srcPath, dstPath); err != nil {
 				return err
@@ -157,7 +184,7 @@ func copyDir(src, dst string) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -168,28 +195,28 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	defer sourceFile.Close()
-	
+
 	// Create destination directory if it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 		return err
 	}
-	
+
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
 	defer destFile.Close()
-	
+
 	_, err = io.Copy(destFile, sourceFile)
 	if err != nil {
 		return err
 	}
-	
+
 	// Copy file permissions
 	sourceInfo, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
-	
+
 	return os.Chmod(dst, sourceInfo.Mode())
 }
