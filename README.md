@@ -63,6 +63,7 @@ All configuration is done through environment variables:
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
 | `BUCKET` | S3 bucket name | `my-gitea-backups` |
 | `S3_LOG_DEBUG` | Enable S3 debug logging | `true` or `false` (default: `false`) |
+| `S3_MULTIPART_ENABLED` | Enable multipart S3 upload and download with 10 MiB parts | `true` or `false` (default: `false`) |
 
 ### FTP Configuration
 

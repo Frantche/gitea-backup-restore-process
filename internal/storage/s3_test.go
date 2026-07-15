@@ -25,6 +25,25 @@ func TestGetS3Config_DefaultLogDebug(t *testing.T) {
 	}
 }
 
+func TestGetS3Config_DefaultMultipartEnabled(t *testing.T) {
+	originalMultipartEnabled := os.Getenv("S3_MULTIPART_ENABLED")
+	os.Unsetenv("S3_MULTIPART_ENABLED")
+	defer func() {
+		if originalMultipartEnabled != "" {
+			os.Setenv("S3_MULTIPART_ENABLED", originalMultipartEnabled)
+		}
+	}()
+
+	config, err := getS3Config()
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if config.MultipartEnabled != false {
+		t.Errorf("Expected MultipartEnabled to be false by default, got %v", config.MultipartEnabled)
+	}
+}
+
 func TestGetS3Config_LogDebugTrue(t *testing.T) {
 	// Set S3_LOG_DEBUG to "true"
 	originalS3LogDebug := os.Getenv("S3_LOG_DEBUG")
@@ -131,6 +150,50 @@ func TestGetS3Config_LogDebugVariousFormats(t *testing.T) {
 
 			if config.LogDebug != tc.expected {
 				t.Errorf("Expected LogDebug to be %v when S3_LOG_DEBUG=%s, got %v", tc.expected, tc.value, config.LogDebug)
+			}
+		})
+	}
+}
+
+func TestGetS3Config_MultipartEnabledVariousFormats(t *testing.T) {
+	testCases := []struct {
+		name     string
+		value    string
+		expected bool
+	}{
+		{"uppercase_true", "TRUE", true},
+		{"mixed_case_true", "True", true},
+		{"numeric_true", "1", true},
+		{"single_char_true", "t", true},
+		{"uppercase_t", "T", true},
+		{"uppercase_false", "FALSE", false},
+		{"mixed_case_false", "False", false},
+		{"numeric_false", "0", false},
+		{"single_char_false", "f", false},
+		{"uppercase_f", "F", false},
+		{"invalid", "invalid", false},
+	}
+
+	originalMultipartEnabled := os.Getenv("S3_MULTIPART_ENABLED")
+	defer func() {
+		if originalMultipartEnabled != "" {
+			os.Setenv("S3_MULTIPART_ENABLED", originalMultipartEnabled)
+		} else {
+			os.Unsetenv("S3_MULTIPART_ENABLED")
+		}
+	}()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			os.Setenv("S3_MULTIPART_ENABLED", tc.value)
+
+			config, err := getS3Config()
+			if err != nil {
+				t.Fatalf("Expected no error, got %v", err)
+			}
+
+			if config.MultipartEnabled != tc.expected {
+				t.Errorf("Expected MultipartEnabled to be %v when S3_MULTIPART_ENABLED=%s, got %v", tc.expected, tc.value, config.MultipartEnabled)
 			}
 		})
 	}
