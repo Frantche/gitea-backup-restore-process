@@ -2,6 +2,7 @@ package database
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -48,11 +49,13 @@ func (p *PostgreSQLAdapter) Backup(settings *config.Settings, giteaConfig *confi
 	defer outFile.Close()
 
 	cmd.Stdout = outFile
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	logger.Debugf("Running PostgreSQL dump command: pg_dump %s", strings.Join(args, " "))
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("pg_dump failed: %w", err)
+		return fmt.Errorf("pg_dump failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 
 	logger.Info("PostgreSQL database backup completed")
@@ -93,8 +96,8 @@ func (p *PostgreSQLAdapter) Restore(settings *config.Settings, giteaConfig *conf
 
 	logger.Debugf("Running PostgreSQL drop command: psql %s", strings.Join(dropArgs, " "))
 
-	if err := dropCmd.Run(); err != nil {
-		return fmt.Errorf("psql schema reset failed: %w", err)
+	if output, err := dropCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("psql schema reset failed: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 
 	// Now restore from backup
@@ -128,8 +131,8 @@ func (p *PostgreSQLAdapter) Restore(settings *config.Settings, giteaConfig *conf
 
 	logger.Debugf("Running PostgreSQL restore command: psql %s", strings.Join(restoreArgs, " "))
 
-	if err := restoreCmd.Run(); err != nil {
-		return fmt.Errorf("psql restore failed: %w", err)
+	if output, err := restoreCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("psql restore failed: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 
 	logger.Info("PostgreSQL database restore completed")

@@ -37,6 +37,7 @@ services:
       BACKUP_MAX_RETENTION: "3"
       # Gitea configuration
       APP_INI_PATH: "/data/gitea/conf/app.ini"
+      GITEA_USER: "1000:1000"
     volumes:
       - gitea-data:/data
     command: ["sleep", "infinity"]

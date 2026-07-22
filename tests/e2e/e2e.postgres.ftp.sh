@@ -29,7 +29,7 @@ docker compose -f "${COMPOSE_FILE}" down
 docker volume ls -q | grep '^docker-compose' | xargs -r docker volume rm -f
 
 echo "🚀 Starting services..."
-docker compose -f "${COMPOSE_FILE}" up -d
+docker compose -f "${COMPOSE_FILE}" up -d --build
 
 # Check if services are running
 echo "📋 Checking service status..."
@@ -37,7 +37,7 @@ docker compose -f "${COMPOSE_FILE}" ps
 
 # Test basic connectivity
 echo "🌐 Testing service connectivity..."
-max_retries=10
+max_retries=30
 retry_interval=5
 attempt=1
 reachable=false
@@ -56,7 +56,7 @@ done
 
 if [ "$reachable" = false ]; then
     echo "❌ Gitea is not accessible after $max_retries attempts"
-    docker logs gitea-db-postgres
+    docker logs gitea-postgres
     exit 1   # exit with failure
 fi
 

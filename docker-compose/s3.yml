@@ -41,6 +41,7 @@ services:
       REGION: "us-east-1"
       # Gitea configuration
       APP_INI_PATH: "/data/gitea/conf/app.ini"
+      GITEA_USER: "1000:1000"
     volumes:
       - gitea-data:/data
     command: ["sleep", "infinity"]
