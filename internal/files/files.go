@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Frantche/gitea-backup-restore-process/internal/config"
@@ -113,8 +115,9 @@ func RestoreFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) er
 	// Restore repositories
 	sourceDir := filepath.Join(settings.RestoreTmpFolder, "repo")
 	if giteaConfig.Repository.Root != "" {
-		if err := copyDir(sourceDir, giteaConfig.Repository.Root); err != nil {
+		if err := replaceDir(sourceDir, giteaConfig.Repository.Root); err != nil {
 			logger.Errorf("Failed to restore repositories: %v", err)
+			return err
 		} else {
 			logger.Debug("Repositories restored successfully")
 		}
@@ -123,8 +126,9 @@ func RestoreFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) er
 	// Restore avatars
 	sourceDir = filepath.Join(settings.RestoreTmpFolder, "avatars")
 	if giteaConfig.Picture.AvatarUploadPath != "" {
-		if err := copyDir(sourceDir, giteaConfig.Picture.AvatarUploadPath); err != nil {
+		if err := replaceDir(sourceDir, giteaConfig.Picture.AvatarUploadPath); err != nil {
 			logger.Errorf("Failed to restore avatars: %v", err)
+			return err
 		} else {
 			logger.Debug("Avatars restored successfully")
 		}
@@ -133,15 +137,82 @@ func RestoreFiles(settings *config.Settings, giteaConfig *config.GiteaConfig) er
 	// Restore repository avatars
 	sourceDir = filepath.Join(settings.RestoreTmpFolder, "repo-avatars")
 	if giteaConfig.Picture.RepositoryAvatarUploadPath != "" {
-		if err := copyDir(sourceDir, giteaConfig.Picture.RepositoryAvatarUploadPath); err != nil {
+		if err := replaceDir(sourceDir, giteaConfig.Picture.RepositoryAvatarUploadPath); err != nil {
 			logger.Errorf("Failed to restore repository avatars: %v", err)
+			return err
 		} else {
 			logger.Debug("Repository avatars restored successfully")
 		}
 	}
 
+	if err := normalizeRestoredOwnership(settings, giteaConfig); err != nil {
+		return err
+	}
+
 	logger.Info("File restore completed")
 	return nil
+}
+
+func replaceDir(src, dst string) error {
+	if _, err := os.Stat(src); err != nil {
+		if os.IsNotExist(err) {
+			logger.Debugf("Source directory does not exist: %s", src)
+			return nil
+		}
+		return err
+	}
+	if err := removeAllWithRetry(dst, os.RemoveAll, cleanTmpRemoveAttempts, cleanTmpRemoveRetryDelay); err != nil {
+		return err
+	}
+	return copyDir(src, dst)
+}
+
+func normalizeRestoredOwnership(settings *config.Settings, giteaConfig *config.GiteaConfig) error {
+	paths := existingRestorePaths(giteaConfig)
+	if len(paths) == 0 {
+		return nil
+	}
+	if settings.GiteaUser() != "" {
+		args := append([]string{"-R", restoreOwnerSpec(settings.GiteaUser())}, paths...)
+		if out, err := exec.Command("chown", args...).CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to chown restored files: %w: %s", err, string(out))
+		}
+	}
+	findArgs := append([]string{}, paths...)
+	findArgs = append(findArgs, "-type", "d", "-exec", "chmod", "0700", "{}", "+")
+	if out, err := exec.Command("find", findArgs...).CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to chmod restored directories: %w: %s", err, string(out))
+	}
+	findArgs = append([]string{}, paths...)
+	findArgs = append(findArgs, "-type", "f", "-exec", "chmod", "u+rw,go-rwx", "{}", "+")
+	if out, err := exec.Command("find", findArgs...).CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to chmod restored files: %w: %s", err, string(out))
+	}
+	return nil
+}
+
+func existingRestorePaths(giteaConfig *config.GiteaConfig) []string {
+	var paths []string
+	for _, path := range []string{
+		giteaConfig.Repository.Root,
+		giteaConfig.Picture.AvatarUploadPath,
+		giteaConfig.Picture.RepositoryAvatarUploadPath,
+	} {
+		if path == "" {
+			continue
+		}
+		if _, err := os.Stat(path); err == nil {
+			paths = append(paths, path)
+		}
+	}
+	return paths
+}
+
+func restoreOwnerSpec(user string) string {
+	if strings.Contains(user, ":") {
+		return user
+	}
+	return user + ":" + user
 }
 
 // copyDir recursively copies a directory

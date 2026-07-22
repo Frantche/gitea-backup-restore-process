@@ -10,19 +10,24 @@ import (
 
 // Settings represents the configuration for gitea backup/restore
 type Settings struct {
-	BackupEnable             bool   `yaml:"backup_enable"`
-	BackupMethod             string `yaml:"backup_method"`
-	BackupFilename           string `yaml:"backup_filename,omitempty"`
-	BackupFileLog            string `yaml:"backup_file_log"`
-	BackupTmpRemoteFilename  string `yaml:"backup_tmp_remote_filename"`
-	BackupPrefix             string `yaml:"backup_prefix"`
-	BackupMaxRetention       int    `yaml:"backup_max_retention"`
-	BackupTmpFolder          string `yaml:"backup_tmp_folder"`
-	BackupTmpFilename        string `yaml:"backup_tmp_filename"`
-	RestoreTmpFolder         string `yaml:"restore_tmp_folder"`
-	RestoreTmpFilename       string `yaml:"restore_tmp_filename"`
-	AppIniPath               string `yaml:"app_ini_path"`
-	giteaUser                string `yaml:"gitea_user"`
+	BackupEnable            bool   `yaml:"backup_enable"`
+	BackupMethod            string `yaml:"backup_method"`
+	BackupFilename          string `yaml:"backup_filename,omitempty"`
+	BackupFileLog           string `yaml:"backup_file_log"`
+	BackupTmpRemoteFilename string `yaml:"backup_tmp_remote_filename"`
+	BackupPrefix            string `yaml:"backup_prefix"`
+	BackupMaxRetention      int    `yaml:"backup_max_retention"`
+	BackupTmpFolder         string `yaml:"backup_tmp_folder"`
+	BackupTmpFilename       string `yaml:"backup_tmp_filename"`
+	RestoreTmpFolder        string `yaml:"restore_tmp_folder"`
+	RestoreTmpFilename      string `yaml:"restore_tmp_filename"`
+	AppIniPath              string `yaml:"app_ini_path"`
+	giteaUser               string `yaml:"gitea_user"`
+}
+
+// GiteaUser returns the user that should own restored Gitea files.
+func (s *Settings) GiteaUser() string {
+	return s.giteaUser
 }
 
 // NewSettings creates a new Settings instance with default values and environment overrides
@@ -127,7 +132,7 @@ func (s *Settings) processTemplates() {
 	// Replace template placeholders in backup filename
 	now := time.Now()
 	dateStr := now.Format("2006-01-02-15-04-05")
-	
+
 	s.BackupTmpRemoteFilename = strings.ReplaceAll(s.BackupTmpRemoteFilename, "@prefix", s.BackupPrefix)
 	s.BackupTmpRemoteFilename = strings.ReplaceAll(s.BackupTmpRemoteFilename, "@date", dateStr)
 }
