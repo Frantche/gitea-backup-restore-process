@@ -29,7 +29,7 @@ docker compose -f "${COMPOSE_FILE}" down
 docker volume ls -q | grep '^docker-compose' | xargs -r docker volume rm -f
 
 echo "🚀 Starting services..."
-docker compose -f "${COMPOSE_FILE}" up -d
+docker compose -f "${COMPOSE_FILE}" up -d --build
 
 # Check if services are running
 echo "📋 Checking service status..."
@@ -41,7 +41,7 @@ docker exec minio-e2e sh -c "mc alias set local http://localhost:9000 minioadmin
 
 # Test basic connectivity
 echo "🌐 Testing service connectivity..."
-max_retries=10
+max_retries=30
 retry_interval=5
 attempt=1
 reachable=false
@@ -74,7 +74,7 @@ fi
 
 # Check that MySQL is working
 echo "🔍 Verifying MySQL connection..."
-docker exec gitea-db-mysql mysqladmin ping -h localhost -u gitea -pgitea123
+docker exec gitea-db-mysql mysqladmin ping -h 127.0.0.1 -P 3306 -u gitea -pgitea123
 
 # Initialize Gitea with a simple admin user
 echo "👤 Initializing Gitea admin user..."

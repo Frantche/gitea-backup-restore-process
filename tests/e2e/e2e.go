@@ -21,8 +21,8 @@ type E2ETest struct {
 	dataVolumeName     string
 	giteaContainerName string
 	giteaClient        *gitea.Client
-	dbVolumeName     string
-	dbContainerName string
+	dbVolumeName       string
+	dbContainerName    string
 	giteaBackupfilelog string
 }
 
@@ -73,9 +73,9 @@ func main() {
 		containerName:      containerName,
 		dataVolumeName:     dataVolumeName,
 		giteaContainerName: giteaContainerName,
-		dbContainerName:	dbContainerName,
-		dbVolumeName:		dbVolumeName,
-		giteaBackupfilelog:	giteaBackupfilelog,
+		dbContainerName:    dbContainerName,
+		dbVolumeName:       dbVolumeName,
+		giteaBackupfilelog: giteaBackupfilelog,
 	}
 
 	if err := test.runE2ETest(); err != nil {
@@ -107,7 +107,7 @@ func (t *E2ETest) runE2ETest() error {
 		return fmt.Errorf("backup failed: %w", err)
 	}
 
-	backfile, err:= t.getRestoreFilename()
+	backfile, err := t.getRestoreFilename()
 	if err != nil {
 		return fmt.Errorf("Error to fetch backup file name: %w", err)
 	}
@@ -123,7 +123,7 @@ func (t *E2ETest) runE2ETest() error {
 
 	// Step 6: Perform restore
 	if err := t.performRestore(backfile); err != nil {
-			return fmt.Errorf("restore failed: %w", err)
+		return fmt.Errorf("restore failed: %w", err)
 	}
 
 	// Step 7: Verify restoration
@@ -207,7 +207,7 @@ func (t *E2ETest) initializeGitea() error {
 		logger.Info("User authentication failed, assuming user will be created during Gitea setup")
 		// For E2E testing, we'll rely on external setup or Docker initialization
 		time.Sleep(10 * time.Second)
-		
+
 		// Try once more
 		_, _, err = client.GetMyUserInfo()
 		if err != nil {
@@ -256,8 +256,6 @@ func (t *E2ETest) createTestData() error {
 	logger.Infof("Issue created: #%d - %s", issue.Index, issue.Title)
 	return nil
 }
-
-
 
 func (t *E2ETest) performBackup() error {
 	logger.Info("Performing backup...")
@@ -315,13 +313,15 @@ func (t *E2ETest) simulateDataLoss() error {
 		return fmt.Errorf("failed to restart DB: %w", err)
 	}
 
+	if err := t.waitForContainerHealthy(t.dbContainerName, 60); err != nil {
+		return fmt.Errorf("database did not become healthy after restart: %w", err)
+	}
+
 	// Restart Gitea service
 	cmd = exec.Command("docker", "start", t.giteaContainerName)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to restart Gitea: %w", err)
 	}
-
-	
 
 	// Wait for Gitea to be ready again
 	time.Sleep(15 * time.Second)
@@ -330,13 +330,27 @@ func (t *E2ETest) simulateDataLoss() error {
 	return nil
 }
 
+func (t *E2ETest) waitForContainerHealthy(containerName string, maxRetries int) error {
+	for i := 0; i < maxRetries; i++ {
+		cmd := exec.Command("docker", "inspect", "--format", "{{.State.Health.Status}}", containerName)
+		output, err := cmd.Output()
+		if err == nil && strings.TrimSpace(string(output)) == "healthy" {
+			return nil
+		}
+
+		time.Sleep(2 * time.Second)
+	}
+
+	return fmt.Errorf("%s not healthy after %d attempts", containerName, maxRetries)
+}
+
 func (t *E2ETest) getRestoreFilename() (string, error) {
 	logger.Info("Performing restore...")
 
 	// Step 1: Get the last line from the backupFileLog file
 	cmd := exec.Command(
 		"docker", "exec", t.giteaContainerName,
-		"sh", "-c", "tail -n 1 " + t.giteaBackupfilelog,
+		"sh", "-c", "tail -n 1 "+t.giteaBackupfilelog,
 	)
 	output, err := cmd.Output()
 	if err != nil {
@@ -351,7 +365,7 @@ func (t *E2ETest) getRestoreFilename() (string, error) {
 	// Step 2: Remove that last line from the backupFileLog file to allow restore
 	cmd = exec.Command(
 		"docker", "exec", t.giteaContainerName,
-		"sh", "-c", "sed -i '$d' " + t.giteaBackupfilelog,
+		"sh", "-c", "sed -i '$d' "+t.giteaBackupfilelog,
 	)
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("failed to remove backup file from log: %w", err)
@@ -365,10 +379,15 @@ func (t *E2ETest) getRestoreFilename() (string, error) {
 func (t *E2ETest) performRestore(backupFile string) error {
 	logger.Info("Performing restore...")
 
+	stopCmd := exec.Command("docker", "stop", t.giteaContainerName)
+	if err := stopCmd.Run(); err != nil {
+		return fmt.Errorf("failed to stop Gitea before restore: %w", err)
+	}
+
 	// Execute restore command in the backup container
 	cmd := exec.Command(
 		"docker", "exec", t.containerName,
-		"sh", "-c", "BACKUP_FILENAME=" + backupFile + " gitea-restore",
+		"sh", "-c", "BACKUP_FILENAME="+backupFile+" gitea-restore",
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -378,8 +397,15 @@ func (t *E2ETest) performRestore(backupFile string) error {
 	logger.Info("Restore completed successfully")
 	logger.Debugf("Restore output: %s", string(output))
 
-	// Wait for Gitea to be fully ready after restore
-	time.Sleep(10 * time.Second)
+	startCmd := exec.Command("docker", "start", t.giteaContainerName)
+	if err := startCmd.Run(); err != nil {
+		return fmt.Errorf("failed to start Gitea after restore: %w", err)
+	}
+
+	if err := t.waitForServices(); err != nil {
+		return fmt.Errorf("failed to wait for Gitea after restore: %w", err)
+	}
+
 	return nil
 }
 

@@ -25,9 +25,37 @@ docker run --rm \
   -e AWS_SECRET_ACCESS_KEY=your_secret_key \
   -e BUCKET=your_bucket \
   -v /path/to/gitea:/data \
-  harbor.frantchenco.page/library/gitea-backup:latest \
+  ghcr.io/frantche/gitea-backup-restore-process:latest \
   gitea-backup
 ```
+
+### Restore with Docker
+
+Restores are intentionally explicit: provide the exact backup archive name with
+`BACKUP_FILENAME`, mount the same Gitea data directory, and keep the database
+reachable from the restore container. Stop the Gitea web container first, but
+keep its database running.
+
+```bash
+docker run --rm \
+  --network your_gitea_network \
+  -e BACKUP_ENABLE=true \
+  -e BACKUP_METHODE=s3 \
+  -e ENDPOINT_URL=https://s3.amazonaws.com \
+  -e AWS_ACCESS_KEY_ID=your_access_key \
+  -e AWS_SECRET_ACCESS_KEY=your_secret_key \
+  -e BUCKET=your_bucket \
+  -e BACKUP_FILENAME=gitea-backup-YYYY-MM-DD-HH-MM-SS.zip \
+  -v /path/to/gitea:/data \
+  ghcr.io/frantche/gitea-backup-restore-process:latest \
+  gitea-restore
+```
+
+The restore command downloads and extracts the archive, replaces the restored
+repositories/avatar directories, restores the database with strict SQL error
+handling, and normalizes restored file ownership for the Gitea user. By default
+that user is `git`; set `GITEA_USER` if your container uses another user or a
+numeric owner such as `1000:1000`.
 
 ### Using Binaries
 
@@ -83,6 +111,7 @@ All configuration is done through environment variables:
 | `APP_INI_PATH` | `/data/gitea/conf/app.ini` | Path to Gitea configuration |
 | `BACKUP_TMP_FOLDER` | `/tmp/backup` | Temporary backup folder |
 | `RESTORE_TMP_FOLDER` | `/tmp/restore` | Temporary restore folder |
+| `GITEA_USER` | `git` | User or `uid:gid` that should own restored repositories and avatars |
 
 ## Database Support
 

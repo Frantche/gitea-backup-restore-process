@@ -16,10 +16,10 @@ services:
     volumes:
       - db-mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pgitea123"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-P", "3306", "-u", "root", "-pgitea123"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   # Gitea with MySQL
   gitea-mysql:
