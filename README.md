@@ -123,7 +123,8 @@ Automatically detects SQLite databases and performs file-based backups.
 Uses `mysqldump` and `mysql` commands. Requires MySQL client tools.
 
 ### PostgreSQL
-Uses `pg_dump` and `psql` commands. Requires PostgreSQL client tools.
+Uses `pg_dump` and `psql` commands. The container image ships PostgreSQL client
+18 so it can back up PostgreSQL 18 servers as well as older supported majors.
 
 ## Development
 

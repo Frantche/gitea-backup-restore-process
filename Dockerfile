@@ -15,9 +15,10 @@ RUN go build -o bin/gitea-backup ./cmd/gitea-backup && \
 FROM ubuntu:26.04
 
 ARG DEBIAN_FRONTEND=noninteractive
-# Set the Postgres MAJOR you want. 15 matches your server (15.14).
-# Change to 16 if you want the newest major.
-ARG PG_MAJOR=15
+# Keep the client at the newest PostgreSQL server major supported by this image.
+# Newer pg_dump clients can dump older supported servers, but older clients
+# refuse to dump newer servers.
+ARG PG_MAJOR=18
 
 # Base tools + add the official PostgreSQL APT repo (PGDG) for up-to-date clients
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -35,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
          wget \
          jq \
          curl \
+    && pg_dump --version | grep -Eq "^pg_dump \(PostgreSQL\) ${PG_MAJOR}\." \
     && apt-get purge -y gnupg lsb-release \
     && rm -rf /var/lib/apt/lists/*
 

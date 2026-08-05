@@ -4,7 +4,7 @@
 services:
   # PostgreSQL database for Gitea
   gitea-db-postgres:
-    image: postgres:15
+    image: postgres:18
     container_name: gitea-db-postgres
     environment:
       POSTGRES_DB: gitea
@@ -13,7 +13,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - db-postgres-data:/var/lib/postgresql/data
+      - db-postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U gitea -d gitea"]
       interval: 10s
