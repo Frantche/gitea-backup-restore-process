@@ -3,6 +3,7 @@ package logger
 import (
 	"log"
 	"os"
+	"strings"
 )
 
 var (
@@ -26,6 +27,9 @@ func Error(v ...interface{}) {
 }
 
 func Debug(v ...interface{}) {
+	if !debugEnabled() {
+		return
+	}
 	DebugLogger.Println(v...)
 }
 
@@ -38,5 +42,12 @@ func Errorf(format string, v ...interface{}) {
 }
 
 func Debugf(format string, v ...interface{}) {
+	if !debugEnabled() {
+		return
+	}
 	DebugLogger.Printf(format, v...)
+}
+
+func debugEnabled() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("LOG_LEVEL")), "debug")
 }

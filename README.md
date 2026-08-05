@@ -112,6 +112,7 @@ All configuration is done through environment variables:
 | `BACKUP_TMP_FOLDER` | `/tmp/backup` | Temporary backup folder |
 | `RESTORE_TMP_FOLDER` | `/tmp/restore` | Temporary restore folder |
 | `GITEA_USER` | `git` | User or `uid:gid` that should own restored repositories and avatars |
+| `LOG_LEVEL` | `info` | Set to `debug` for additional operational details. Credentials are never logged. |
 
 ## Database Support
 
