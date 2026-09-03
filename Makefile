@@ -1,4 +1,4 @@
-.PHONY: help build test test-unit test-integration test-container-postgres-client test-e2e-mysql-s3 test-e2e-local test-e2e-postgres-s3 test-e2e-mysql-ftp test-e2e-postgres-ftp clean
+.PHONY: help build test test-unit test-integration test-container-git-user test-container-postgres-client test-e2e-mysql-s3 test-e2e-local test-e2e-postgres-s3 test-e2e-mysql-ftp test-e2e-postgres-ftp clean
 
 help: ## Display this help message
 	@echo "Available targets:"
@@ -25,6 +25,9 @@ test-integration: ## Run integration tests
 
 test-container-postgres-client: ## Verify the image ships the supported PostgreSQL client major
 	@./tests/container/postgres-client-version.sh
+
+test-container-git-user: ## Verify the image ships the Gitea git user
+	@./tests/container/git-user.sh
 
 test-e2e-local: ## Run local E2E tests
 	$(MAKE) build
