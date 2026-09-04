@@ -40,6 +40,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get purge -y gnupg lsb-release \
     && rm -rf /var/lib/apt/lists/*
 
+RUN groupmod --new-name git ubuntu \
+    && usermod --login git --home /data/git ubuntu
+
 # Copy Go binaries from builder stage
 COPY --from=builder /app/bin/gitea-backup /usr/local/bin/
 COPY --from=builder /app/bin/gitea-restore /usr/local/bin/

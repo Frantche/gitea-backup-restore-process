@@ -96,6 +96,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Validate Docker image runtime users
+        run: make test-container-git-user
+
   publish-image:
     runs-on: ubuntu-latest
     needs: build-and-test
