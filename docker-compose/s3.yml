@@ -2,24 +2,26 @@
 # This file defines the S3 storage service and backup/restore container
 
 services:
-  # MinIO S3-compatible storage
+  # Garage S3-compatible storage
   s3:
-    image: minio/minio:latest
-    container_name: minio-e2e
+    image: dxflrs/garage:v2.4.1
+    container_name: garage-e2e
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin123
+      GARAGE_DEFAULT_ACCESS_KEY: GK0123456789abcdef0123456789abcdef
+      GARAGE_DEFAULT_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      GARAGE_DEFAULT_BUCKET: gitea-backup
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "3900:3900"
     volumes:
-      - minio-data:/data
-    command: server /data --console-address ":9001"
+      - garage-data:/var/lib/garage
+      - ./garage.toml:/etc/garage.toml:ro
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      test: ["CMD", "/garage", "status"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
 
   # Base backup/restore process
   gitea-backup-restore:
@@ -32,13 +34,13 @@ services:
       # Backup configuration for S3
       BACKUP_ENABLE: "true"
       BACKUP_METHODE: "s3"
-      ENDPOINT_URL: "http://s3:9000"
-      AWS_ACCESS_KEY_ID: "minioadmin"
-      AWS_SECRET_ACCESS_KEY: "minioadmin123"
+      ENDPOINT_URL: "http://s3:3900"
+      AWS_ACCESS_KEY_ID: "GK0123456789abcdef0123456789abcdef"
+      AWS_SECRET_ACCESS_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
       BUCKET: "gitea-backup"
       BACKUP_PREFIX: "e2e-test-s3"
       BACKUP_MAX_RETENTION: "3"
-      REGION: "us-east-1"
+      REGION: "garage"
       # Gitea configuration
       APP_INI_PATH: "/data/gitea/conf/app.ini"
       GITEA_USER: "1000:1000"
@@ -49,5 +51,5 @@ services:
       - s3
 
 volumes:
-  minio-data:
+  garage-data:
   gitea-data:

@@ -20,7 +20,7 @@ The E2E testing infrastructure validates the complete backup and restore workflo
 - **PostgreSQL 15**: Alternative relational database
 
 ### Storage Backends
-- **S3 (MinIO)**: S3-compatible object storage
+- **S3 (Garage)**: S3-compatible object storage
 - **FTP**: Traditional file transfer protocol
 
 ### Test Matrix
@@ -154,8 +154,8 @@ A complete Go-based test that performs the full backup/restore cycle with data v
 
 Multiple compose files for different test scenarios:
 
-- `docker-compose.e2e.mysql.s3.yml`: MySQL + S3 (default)
-- `docker-compose.e2e.postgres.s3.yml`: PostgreSQL + S3
+- `docker-compose/e2e.mysql.s3.yml`: MySQL + S3 (Garage)
+- `docker-compose/e2e.postgres.s3.yml`: PostgreSQL + S3 (Garage)
 - `docker-compose.e2e.mysql.ftp.yml`: MySQL + FTP
 - `docker-compose.e2e.postgres.ftp.yml`: PostgreSQL + FTP
 
@@ -163,7 +163,7 @@ Each defines a complete testing environment with:
 
 - **Gitea**: Latest version with appropriate database backend
 - **Database**: MySQL 8.0 or PostgreSQL 15
-- **Storage**: MinIO (S3) or vsftpd (FTP)
+- **Storage**: Garage (S3) or vsftpd (FTP)
 - **Backup Container**: Built from project Dockerfile
 
 ### Configuration
@@ -217,12 +217,12 @@ make build
 
 ### Scenario 1: Default (MySQL + S3)
 - Uses MySQL 8.0 database
-- Uses MinIO S3-compatible storage
+- Uses Garage S3-compatible storage
 - Tests standard deployment pattern
 
 ### Scenario 2: PostgreSQL + S3
 - Uses PostgreSQL 15 database
-- Uses MinIO S3-compatible storage
+- Uses Garage S3-compatible storage
 - Tests PostgreSQL backup/restore functionality
 
 ### Scenario 3: MySQL + FTP
@@ -307,8 +307,8 @@ docker exec gitea-db-e2e-postgres pg_isready -U gitea -d gitea
 # FTP connection test  
 docker exec gitea-backup-e2e-ftp nc -w 5 ftp-server 21
 
-# MinIO S3 health check
-docker exec gitea-backup-e2e curl -f http://minio:9000/minio/health/live
+# Garage health check
+docker exec garage-e2e /garage status
 ```
 
 ## Integration with CI
