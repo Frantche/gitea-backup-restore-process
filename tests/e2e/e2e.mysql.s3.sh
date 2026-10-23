@@ -35,10 +35,6 @@ docker compose -f "${COMPOSE_FILE}" up -d --build
 echo "📋 Checking service status..."
 docker compose -f "${COMPOSE_FILE}" ps
 
-# Setup MinIO bucket
-echo "📦 Setting up MinIO bucket..."
-docker exec minio-e2e sh -c "mc alias set local http://localhost:9000 minioadmin minioadmin123 && mc mb local/gitea-backup" || echo "Bucket might already exist"
-
 # Test basic connectivity
 echo "🌐 Testing service connectivity..."
 max_retries=30
@@ -64,13 +60,19 @@ if [ "$reachable" = false ]; then
     exit 1   # exit with failure
 fi
 
-if curl -f http://localhost:9000/minio/health/live > /dev/null 2>&1; then
-    echo "✅ MinIO is accessible"
-else
-    echo "❌ MinIO is not accessible"
-    docker logs minio-e2e
-    exit 1
-fi
+echo "🔍 Waiting for Garage to become healthy..."
+max_retries=30
+attempt=1
+while ! docker exec garage-e2e /garage status > /dev/null 2>&1; do
+    if [ "$attempt" -ge "$max_retries" ]; then
+        echo "❌ Garage is not healthy after $max_retries attempts"
+        docker logs garage-e2e
+        exit 1
+    fi
+    sleep 2
+    attempt=$((attempt+1))
+done
+echo "✅ Garage is healthy"
 
 # Check that MySQL is working
 echo "🔍 Verifying MySQL connection..."
