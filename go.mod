@@ -3,12 +3,12 @@ module github.com/Frantche/gitea-backup-restore-process
 go 1.27.4
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.48.1
+	github.com/aws/aws-sdk-go-v2 v1.48.2
 	github.com/aws/aws-sdk-go-v2/config v1.33.22
 	github.com/aws/aws-sdk-go-v2/credentials v1.21.4
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.23.29
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.116.1
-	github.com/aws/smithy-go v1.28.10
+	github.com/aws/smithy-go v1.28.11
 	github.com/jlaffaye/ftp v0.2.4
 )
 
